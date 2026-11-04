@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Search and explore the Keldric Gaming game database.">
+  <title>Keldric Gaming Database</title>
+  <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.5.0/dist/css/tabulator.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Keldric Gaming</p>
+        <h1>Game Database</h1>
+        <p class="intro">Search, filter, and sort the games catalog. Drag column headings to rearrange columns; the game name stays in place.</p>
+      </div>
+      <div class="header-actions">
+        <label class="search-label" for="global-search">Search all columns</label>
+        <input id="global-search" type="search" placeholder="Type to search…" autocomplete="off">
+        <button id="clear-filters" type="button">Clear filters</button>
+      </div>
+    </header>
+
+    <div id="status" class="status" role="status" aria-live="polite">Loading game database…</div>
+    <section class="table-frame" aria-label="Game database table">
+      <div id="game-table"></div>
+    </section>
+    <footer class="page-footer">
+      <span id="record-count"></span>
+      <span>Tip: use the filter boxes under each heading to narrow a column.</span>
+    </footer>
+  </main>
+
+  <script src="https://unpkg.com/tabulator-tables@6.5.0/dist/js/tabulator.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
