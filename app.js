@@ -1,157 +1,194 @@
 "use strict";
 
-// The web app is configured for the Master worksheet and returns JSON or JSONP.
+// This endpoint reads the Master worksheet and returns JSONP for the GitHub Pages site.
 const API_URL = "https://script.google.com/macros/s/AKfycbw_-kRO0YgDvL3n4VQ3xtepP4AZUzVcLoKX7uZc_CS5rMwfihPdWeNZ5QM2PloVx7Jt/exec";
-const LINK_COLUMNS = new Set([1, 2]); // B–C only
-const statusNode = document.getElementById("status");
-const countNode = document.getElementById("record-count");
-const searchNode = document.getElementById("global-search");
-let table;
+const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
+const statusElement = document.getElementById("status");
+const countElement = document.getElementById("record-count");
+const searchElement = document.getElementById("global-search");
+const clearButton = document.getElementById("clear-filters");
 
-function setStatus(message, isError = false) {
-  statusNode.textContent = message;
-  statusNode.classList.toggle("error", isError);
+let table = null;
+let searchableFields = [];
+
+function setStatus(message, isError) {
+  statusElement.textContent = message;
+  statusElement.classList.toggle("error", Boolean(isError));
 }
 
 function loadDatabase() {
-  return new Promise((resolve, reject) => {
-    const callbackName = `kgDatabase_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return new Promise(function (resolve, reject) {
+    const callbackName = "kgDatabase_" + Date.now() + "_" + Math.random().toString(36).slice(2);
     const script = document.createElement("script");
-    let settled = false;
-    const timeout = window.setTimeout(() => finish(new Error("The database took too long to respond. Please try again.")), 90000);
+    let completed = false;
+
+    const timeoutId = window.setTimeout(function () {
+      finish(new Error("The database did not respond in time. Please refresh and try again."));
+    }, 60000);
 
     function finish(error, payload) {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeout);
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(timeoutId);
       delete window[callbackName];
       script.remove();
       if (error) reject(error);
       else resolve(payload);
     }
 
-    window[callbackName] = (payload) => {
+    window[callbackName] = function (payload) {
       if (!payload || payload.error) {
-        finish(new Error(payload?.error || "The database returned an empty response."));
+        finish(new Error(payload && payload.error ? payload.error : "The database returned no data."));
         return;
       }
       finish(null, payload);
     };
-    script.onerror = () => finish(new Error("Could not load the Apps Script endpoint. Check that its web app deployment is active and accessible to anyone with the link."));
-    script.src = `${API_URL}${API_URL.includes("?") ? "&" : "?"}callback=${encodeURIComponent(callbackName)}&_=${Date.now()}`;
+
+    script.async = true;
+    script.onerror = function () {
+      finish(new Error("The Apps Script endpoint could not be loaded. Check that the web app deployment is active and accessible."));
+    };
+    script.src = API_URL + "?callback=" + encodeURIComponent(callbackName) + "&_=" + Date.now();
     document.head.appendChild(script);
   });
 }
 
-function normalizePayload(payload) {
-  if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
-    throw new Error("Unexpected response format. Expected headers and rows arrays.");
-  }
-
-  const columns = payload.headers.map((header, index) => ({
-    title: String(header || `Column ${index + 1}`),
-    titleFormatter: (_cell, formatterParams, onRendered) => {
-      const title = document.createElement("span");
-      title.textContent = formatterParams.title;
-      return title;
-    },
-    titleFormatterParams: { title: String(header || `Column ${index + 1}`) },
-    field: `c${index}`,
-    headerFilter: "input",
-    headerFilterPlaceholder: "Filter…",
-    headerSort: true,
-    sorter: "string",
-    minWidth: index === 0 ? 190 : 115,
-    width: index === 0 ? 230 : undefined,
-    frozen: index === 0,
-    movable: index !== 0,
-    formatter: LINK_COLUMNS.has(index) ? linkFormatter : textFormatter,
-  }));
-
-  const data = payload.rows.map((row) => {
-    const record = {};
-    row.forEach((cell, index) => {
-      const safeCell = cell && typeof cell === "object" ? cell : { text: cell, url: null };
-      record[`c${index}`] = safeCell.text == null ? "" : String(safeCell.text);
-      if (LINK_COLUMNS.has(index)) record[`url${index}`] = safeCell.url || "";
-    });
-    record.__searchText = Object.keys(record)
-      .filter((key) => /^c\d+$/.test(key))
-      .map((key) => record[key])
-      .join(" ")
-      .toLocaleLowerCase();
-    return record;
-  });
-
-  return { columns, data };
+function makeTextElement(value) {
+  const span = document.createElement("span");
+  span.textContent = value == null ? "" : String(value);
+  return span;
 }
 
 function textFormatter(cell) {
-  const text = document.createElement("span");
-  text.textContent = cell.getValue() ?? "";
-  return text;
+  return makeTextElement(cell.getValue());
 }
 
 function linkFormatter(cell) {
+  const fieldIndex = Number(cell.getField().slice(1));
   const row = cell.getRow().getData();
-  const index = Number(cell.getField().slice(1));
-  const label = cell.getValue() ?? "";
-  const url = row[`url${index}`];
-  if (!url || !/^https?:\/\//i.test(url)) return label;
+  const label = cell.getValue() == null ? "" : String(cell.getValue());
+  const destination = row["url" + fieldIndex];
+
+  if (!destination) return makeTextElement(label);
+
+  let safeUrl;
+  try {
+    safeUrl = new URL(String(destination), window.location.href);
+  } catch (_error) {
+    return makeTextElement(label);
+  }
+
+  if (safeUrl.protocol !== "https:" && safeUrl.protocol !== "http:") {
+    return makeTextElement(label);
+  }
 
   const anchor = document.createElement("a");
-  anchor.textContent = label;
-  anchor.href = url;
+  anchor.href = safeUrl.href;
   anchor.target = "_blank";
   anchor.rel = "noopener noreferrer";
-  anchor.setAttribute("aria-label", `${label || "Open link"} (opens in a new tab)`);
+  anchor.textContent = label || safeUrl.hostname;
+  anchor.setAttribute("aria-label", anchor.textContent + " (opens in a new tab)");
   return anchor;
 }
 
-function applyGlobalSearch() {
-  const query = searchNode.value.trim().toLocaleLowerCase();
-  if (!query) {
-    table.clearFilter();
-    return;
+function normalizeResponse(payload) {
+  if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
+    throw new Error("The endpoint response must contain headers and rows arrays.");
   }
-  table.setFilter("__searchText", "like", query);
+
+  searchableFields = payload.headers.map(function (_header, index) {
+    return "c" + index;
+  });
+
+  const columns = payload.headers.map(function (header, index) {
+    const definition = {
+      title: header == null || String(header).trim() === "" ? "Column " + (index + 1) : String(header),
+      field: "c" + index,
+      headerFilter: "input",
+      headerFilterPlaceholder: "Filter…",
+      headerSort: true,
+      sorter: "string",
+      minWidth: index === 0 ? 190 : 115,
+      frozen: index === 0,
+      hozAlign: index === 0 ? "left" : "center",
+      headerHozAlign: index === 0 ? "left" : "center",
+      formatter: LINK_COLUMNS.has(index) ? linkFormatter : textFormatter,
+    };
+
+    if (index === 0) definition.width = 230;
+    return definition;
+  });
+
+  const data = payload.rows.filter(Array.isArray).map(function (row) {
+    const record = {};
+    payload.headers.forEach(function (_header, index) {
+      const cell = row[index];
+      const cellObject = cell && typeof cell === "object" ? cell : { text: cell, url: null };
+      record["c" + index] = cellObject.text == null ? "" : String(cellObject.text);
+      if (LINK_COLUMNS.has(index)) record["url" + index] = cellObject.url || "";
+    });
+    return record;
+  });
+
+  return { columns: columns, data: data };
 }
 
-async function start() {
-  if (typeof Tabulator === "undefined") {
-    setStatus("The table library did not load. Check your connection and refresh the page.", true);
+function globalSearchFilter(rowData) {
+  const query = searchElement.value.trim().toLocaleLowerCase();
+  if (!query) return true;
+
+  return searchableFields.some(function (field) {
+    return String(rowData[field] || "").toLocaleLowerCase().includes(query);
+  });
+}
+
+function applyGlobalSearch() {
+  if (!table) return;
+  if (searchElement.value.trim() === "") {
+    table.clearFilter(); // Keeps the individual column header filters.
+  } else {
+    table.setFilter(globalSearchFilter);
+  }
+}
+
+async function startDatabase() {
+  if (typeof window.Tabulator === "undefined") {
+    setStatus("The table library did not load. Check your internet connection and refresh.", true);
     return;
   }
+
+  setStatus("Loading game database…", false);
 
   try {
     const payload = await loadDatabase();
-    const { columns, data } = normalizePayload(payload);
-    table = new Tabulator("#game-table", {
-      data,
-      columns,
+    const normalized = normalizeResponse(payload);
+
+    table = new window.Tabulator("#game-table", {
+      data: normalized.data,
+      columns: normalized.columns,
       height: "100%",
       layout: "fitData",
       movableColumns: true,
       movableRows: false,
       placeholder: "No games match these filters.",
-      renderVertical: "virtual",
       initialSort: [{ column: "c0", dir: "asc" }],
-      filterMode: "local",
     });
-    searchNode.addEventListener("input", applyGlobalSearch);
-    document.getElementById("clear-filters").addEventListener("click", () => {
-      searchNode.value = "";
+
+    searchElement.addEventListener("input", applyGlobalSearch);
+    clearButton.addEventListener("click", function () {
+      searchElement.value = "";
       table.clearFilter(true);
     });
 
-    const count = Number.isFinite(Number(payload.totalRecords)) ? Number(payload.totalRecords) : data.length;
-    countNode.textContent = `${count.toLocaleString()} games`;
-    setStatus(`Loaded ${count.toLocaleString()} games from the Master worksheet.`);
+    const recordCount = Number(payload.totalRecords);
+    const shownCount = Number.isFinite(recordCount) ? recordCount : normalized.data.length;
+    countElement.textContent = shownCount.toLocaleString() + " games";
+    setStatus("Loaded " + shownCount.toLocaleString() + " games from the Master worksheet.", false);
   } catch (error) {
-    console.error("Keldric Gaming database load failed:", error);
-    setStatus(`Could not load the game database. ${error.message}`, true);
-    countNode.textContent = "";
+    console.error("Keldric Gaming database error:", error);
+    countElement.textContent = "";
+    setStatus("Could not load the game database. " + error.message, true);
   }
 }
 
-start();
+startDatabase();
