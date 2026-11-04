@@ -38,6 +38,8 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .tabulator .tabulator-header-filter input::placeholder { color: #89949b; }
 .tabulator .tabulator-row { min-height: 36px; border-bottom: 1px solid #30383b; background: #1c2225; }
 .tabulator .tabulator-row .tabulator-cell { padding: 8px; color: #e8edf1 !important; }
+#game-table .tabulator .tabulator-row .tabulator-cell,
+#game-table .tabulator .tabulator-row .tabulator-cell span { color: #f5f7fa !important; }
 .tabulator .tabulator-row.tabulator-row-even { background: #222a2d; }
 .tabulator .tabulator-row:hover { background: #2a3530; }
 .tabulator .tabulator-row.tabulator-selected { background: #304237; }
