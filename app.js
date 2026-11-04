@@ -2,7 +2,7 @@
 
 // The web app is configured for the Master worksheet and returns JSON or JSONP.
 const API_URL = "https://script.google.com/macros/s/AKfycbw_-kRO0YgDvL3n4VQ3xtepP4AZUzVcLoKX7uZc_CS5rMwfihPdWeNZ5QM2PloVx7Jt/exec";
-const LINK_COLUMNS = new Set([1, 2, 3, 4]); // B–E only
+const LINK_COLUMNS = new Set([1, 2]); // B–C only
 const statusNode = document.getElementById("status");
 const countNode = document.getElementById("record-count");
 const searchNode = document.getElementById("global-search");
