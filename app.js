@@ -125,10 +125,6 @@ const columns = payload.headers.map(function (header, index) {
   return definition;
 });
 
-    if (index === 0) definition.width = 230;
-    return definition;
-  });
-
   const data = payload.rows.filter(Array.isArray).map(function (row) {
     const record = {};
     payload.headers.forEach(function (_header, index) {
