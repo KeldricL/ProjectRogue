@@ -122,7 +122,23 @@ function normalizeResponse(payload) {
     };
 
     if (index === 1) {
-      definition.sorterParams = { alignEmptyValues: "bottom" };
+      definition.sorter = function (a, b, aRow, bRow) {
+        const aData = aRow.getData();
+        const bData = bRow.getData();
+        const aText = a == null ? "" : String(a).trim();
+        const bText = b == null ? "" : String(b).trim();
+        const aUrl = String(aData.url1 || "").trim();
+        const bUrl = String(bData.url1 || "").trim();
+        const aHasData = Boolean(aText || aUrl);
+        const bHasData = Boolean(bText || bUrl);
+
+        if (aHasData !== bHasData) return aHasData ? -1 : 1;
+
+        const aSortValue = aText || aUrl;
+        const bSortValue = bText || bUrl;
+        return aSortValue.localeCompare(bSortValue, undefined, { sensitivity: "base" })
+          || aUrl.localeCompare(bUrl, undefined, { sensitivity: "base" });
+      };
     }
 
     if (index === 0) definition.width = isPhone ? 150 : 230;
