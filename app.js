@@ -113,6 +113,9 @@ function normalizeResponse(payload) {
       hozAlign: index === 0 ? "left" : "center",
       headerHozAlign: index === 0 ? "left" : "center",
       formatter: LINK_COLUMNS.has(index) ? linkFormatter : textFormatter,
+      if (index === 1) {
+  definition.sorterParams = { alignEmptyValues: "top" };
+}
     };
 
     if (index === 0) definition.width = 230;
@@ -171,7 +174,7 @@ async function startDatabase() {
       movableColumns: true,
       movableRows: false,
       placeholder: "No games match these filters.",
-      initialSort: [{ column: "c0", dir: "asc" }],
+      initialSort: [{ column: "c1", dir: "asc" }],
     });
 
     searchElement.addEventListener("input", applyGlobalSearch);
