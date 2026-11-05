@@ -118,7 +118,7 @@ const columns = payload.headers.map(function (header, index) {
   };
 
   if (index === 1) {
-    definition.sorterParams = { alignEmptyValues: "top" };
+    definition.sorterParams = { alignEmptyValues: "bottom" };
   }
 
   if (index === 0) definition.width = 230;
