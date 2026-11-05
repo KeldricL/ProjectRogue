@@ -7,6 +7,7 @@ const statusElement = document.getElementById("status");
 const countElement = document.getElementById("record-count");
 const searchElement = document.getElementById("global-search");
 const clearButton = document.getElementById("clear-filters");
+const fullscreenButton = document.getElementById("fullscreen-toggle");
 
 let table = null;
 let searchableFields = [];
@@ -176,6 +177,34 @@ function applyGlobalSearch() {
     table.setFilter(globalSearchFilter);
   }
 }
+
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    if (!document.fullscreenEnabled || typeof document.documentElement.requestFullscreen !== "function") {
+      setStatus("Full screen is not available in this browser or embed.", true);
+      return;
+    }
+
+    await document.documentElement.requestFullscreen();
+  } catch (error) {
+    console.error("Keldric Gaming full-screen error:", error);
+    setStatus("Could not enter full screen. Check that the Blogger iframe allows full screen, or press Esc to exit.", true);
+  }
+}
+
+fullscreenButton.addEventListener("click", toggleFullscreen);
+
+document.addEventListener("fullscreenchange", function () {
+  const isFullscreen = Boolean(document.fullscreenElement);
+  fullscreenButton.textContent = isFullscreen ? "Exit full screen" : "Full screen";
+  fullscreenButton.setAttribute("aria-pressed", String(isFullscreen));
+  if (table) window.requestAnimationFrame(function () { table.redraw(true); });
+});
 
 async function startDatabase() {
   if (typeof window.Tabulator === "undefined") {
