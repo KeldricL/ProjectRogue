@@ -8,9 +8,31 @@ const countElement = document.getElementById("record-count");
 const searchElement = document.getElementById("global-search");
 const clearButton = document.getElementById("clear-filters");
 const fullscreenButton = document.getElementById("fullscreen-toggle");
+const COLUMN_PREFERENCES_KEY = "keldric-gaming-hidden-columns-v1";
 
 let table = null;
 let searchableFields = [];
+let hiddenColumnFields = loadHiddenColumns();
+
+function loadHiddenColumns() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(COLUMN_PREFERENCES_KEY) || "[]");
+    if (!Array.isArray(stored)) return new Set();
+    return new Set(stored.filter(function (field) {
+      return typeof field === "string" && /^c\d+$/.test(field) && field !== "c0";
+    }));
+  } catch (_error) {
+    return new Set();
+  }
+}
+
+function saveHiddenColumns() {
+  try {
+    window.localStorage.setItem(COLUMN_PREFERENCES_KEY, JSON.stringify(Array.from(hiddenColumnFields)));
+  } catch (_error) {
+    // The chooser still works for this visit if browser storage is unavailable.
+  }
+}
 
 function setStatus(message, isError) {
   statusElement.textContent = message;
@@ -109,6 +131,7 @@ function normalizeResponse(payload) {
         ? "Column " + (index + 1)
         : String(header),
       field: "c" + index,
+      visible: index === 0 || !hiddenColumnFields.has("c" + index),
       headerFilter: "input",
       headerFilterPlaceholder: "Filter…",
       headerSort: true,
@@ -206,6 +229,147 @@ document.addEventListener("fullscreenchange", function () {
   if (table) window.requestAnimationFrame(function () { table.redraw(true); });
 });
 
+function addColumnPicker(columns) {
+  const headerActions = document.querySelector(".header-actions");
+  if (!headerActions) return;
+
+  const actionRow = document.createElement("div");
+  actionRow.className = "header-button-row";
+  if (fullscreenButton && fullscreenButton.parentElement === headerActions) {
+    headerActions.insertBefore(actionRow, fullscreenButton);
+    actionRow.appendChild(fullscreenButton);
+  } else {
+    headerActions.appendChild(actionRow);
+  }
+
+  const toggleButton = document.createElement("button");
+  toggleButton.id = "column-picker-toggle";
+  toggleButton.type = "button";
+  toggleButton.textContent = "Choose columns";
+  toggleButton.setAttribute("aria-expanded", "false");
+  toggleButton.setAttribute("aria-controls", "column-picker-menu");
+  actionRow.insertBefore(toggleButton, fullscreenButton || null);
+
+  const menu = document.createElement("div");
+  menu.id = "column-picker-menu";
+  menu.className = "column-picker-menu";
+  menu.hidden = true;
+  menu.setAttribute("role", "dialog");
+  menu.setAttribute("aria-label", "Choose visible columns");
+
+  const menuHeader = document.createElement("div");
+  menuHeader.className = "column-picker-header";
+
+  const menuTitle = document.createElement("strong");
+  menuTitle.textContent = "Visible columns";
+
+  const showAllButton = document.createElement("button");
+  showAllButton.type = "button";
+  showAllButton.className = "column-picker-show-all";
+  showAllButton.textContent = "Show all";
+
+  const choiceList = document.createElement("div");
+  choiceList.className = "column-picker-list";
+  choiceList.setAttribute("role", "group");
+  choiceList.setAttribute("aria-label", "Database columns");
+
+  const doneButton = document.createElement("button");
+  doneButton.type = "button";
+  doneButton.className = "column-picker-done";
+  doneButton.textContent = "Done";
+
+  menuHeader.append(menuTitle, showAllButton);
+  menu.append(menuHeader, choiceList, doneButton);
+  headerActions.appendChild(menu);
+
+  const checkboxes = [];
+
+  function syncCheckboxes() {
+    checkboxes.forEach(function (entry) {
+      entry.checkbox.checked = entry.field === "c0" || !hiddenColumnFields.has(entry.field);
+    });
+  }
+
+  columns.forEach(function (definition) {
+    const field = definition.field;
+    const label = document.createElement("label");
+    label.className = "column-picker-choice";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = field === "c0" || !hiddenColumnFields.has(field);
+    checkbox.disabled = field === "c0";
+
+    const text = document.createElement("span");
+    text.textContent = field === "c0" ? definition.title + " (always shown)" : definition.title;
+
+    checkbox.addEventListener("change", function () {
+      const column = table.getColumn(field);
+      if (!column || field === "c0") {
+        checkbox.checked = true;
+        return;
+      }
+
+      if (checkbox.checked) {
+        column.show();
+        hiddenColumnFields.delete(field);
+      } else {
+        column.hide();
+        hiddenColumnFields.add(field);
+      }
+
+      saveHiddenColumns();
+      window.requestAnimationFrame(function () { table.redraw(true); });
+    });
+
+    label.append(checkbox, text);
+    choiceList.appendChild(label);
+    checkboxes.push({ field: field, checkbox: checkbox });
+  });
+
+  function closeMenu() {
+    menu.hidden = true;
+    toggleButton.setAttribute("aria-expanded", "false");
+  }
+
+  toggleButton.addEventListener("click", function () {
+    menu.hidden = !menu.hidden;
+    toggleButton.setAttribute("aria-expanded", String(!menu.hidden));
+    if (!menu.hidden) {
+      const firstEnabled = choiceList.querySelector("input:not(:disabled)");
+      if (firstEnabled) firstEnabled.focus();
+    }
+  });
+
+  showAllButton.addEventListener("click", function () {
+    hiddenColumnFields.clear();
+    columns.forEach(function (definition) {
+      if (definition.field !== "c0") table.showColumn(definition.field);
+    });
+    saveHiddenColumns();
+    syncCheckboxes();
+    window.requestAnimationFrame(function () { table.redraw(true); });
+  });
+
+  doneButton.addEventListener("click", function () {
+    closeMenu();
+    toggleButton.focus();
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!menu.hidden && !menu.contains(event.target) && !toggleButton.contains(event.target)) {
+      closeMenu();
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && !menu.hidden) {
+      closeMenu();
+      toggleButton.focus();
+    }
+  });
+}
+
 async function startDatabase() {
   if (typeof window.Tabulator === "undefined") {
     setStatus("The table library did not load. Check your internet connection and refresh.", true);
@@ -228,6 +392,8 @@ async function startDatabase() {
       placeholder: "No games match these filters.",
       initialSort: [{ column: "c1", dir: "asc" }],
     });
+
+    addColumnPicker(normalized.columns);
 
     searchElement.addEventListener("input", applyGlobalSearch);
     clearButton.addEventListener("click", function () {
