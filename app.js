@@ -100,30 +100,34 @@ function normalizeResponse(payload) {
     return "c" + index;
   });
 
-const columns = payload.headers.map(function (header, index) {
-  const definition = {
-    title: header == null || String(header).trim() === ""
-      ? "Column " + (index + 1)
-      : String(header),
-    field: "c" + index,
-    headerFilter: "input",
-    headerFilterPlaceholder: "Filter…",
-    headerSort: true,
-    sorter: "string",
-    minWidth: index === 0 ? 190 : 115,
-    frozen: index === 0,
-    hozAlign: index === 0 ? "left" : "center",
-    headerHozAlign: index === 0 ? "left" : "center",
-    formatter: LINK_COLUMNS.has(index) ? linkFormatter : textFormatter,
-  };
+  const isPhone = window.matchMedia("(max-width: 600px)").matches;
 
-  if (index === 1) {
-    definition.sorterParams = { alignEmptyValues: "bottom" };
-  }
+  const columns = payload.headers.map(function (header, index) {
+    const definition = {
+      title: header == null || String(header).trim() === ""
+        ? "Column " + (index + 1)
+        : String(header),
+      field: "c" + index,
+      headerFilter: "input",
+      headerFilterPlaceholder: "Filter…",
+      headerSort: true,
+      sorter: "string",
+      minWidth: index === 0
+        ? (isPhone ? 130 : 190)
+        : (isPhone ? 90 : 115),
+      frozen: index === 0,
+      hozAlign: index === 0 ? "left" : "center",
+      headerHozAlign: index === 0 ? "left" : "center",
+      formatter: LINK_COLUMNS.has(index) ? linkFormatter : textFormatter,
+    };
 
-  if (index === 0) definition.width = 230;
-  return definition;
-});
+    if (index === 1) {
+      definition.sorterParams = { alignEmptyValues: "bottom" };
+    }
+
+    if (index === 0) definition.width = isPhone ? 150 : 230;
+    return definition;
+  });
 
   const data = payload.rows.filter(Array.isArray).map(function (row) {
     const record = {};

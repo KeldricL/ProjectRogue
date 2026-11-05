@@ -58,3 +58,19 @@ button:hover { border-color: #6dc583; background: #30393a; }
   .table-frame { height: 70vh; min-height: 420px; }
   .page-footer { flex-direction: column; gap: 5px; }
 }
+
+@media (max-width: 600px) {
+  .page-shell { padding: 12px 8px 16px; }
+  .page-header { gap: 12px; margin-bottom: 12px; }
+  h1 { font-size: 1.6rem; }
+  .intro { font-size: .9rem; }
+  .header-actions { grid-template-columns: minmax(0, 1fr); }
+  .search-label { grid-column: 1; }
+  .header-actions button { width: 100%; }
+  .table-frame { height: 65vh; min-height: 360px; border-radius: 6px; }
+  .tabulator { font-size: 12px; }
+  .tabulator .tabulator-header .tabulator-col .tabulator-col-content { padding: 7px 4px; }
+  .tabulator .tabulator-header-filter input { min-width: 44px; margin: 2px 2px 4px; padding: 4px 3px; font-size: 11px; }
+  .tabulator .tabulator-row .tabulator-cell { padding: 6px 5px; }
+  .page-footer { font-size: .75rem; }
+}
