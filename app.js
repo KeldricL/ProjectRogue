@@ -9,6 +9,7 @@ const searchElement = document.getElementById("global-search");
 const clearButton = document.getElementById("clear-filters");
 const fullscreenButton = document.getElementById("fullscreen-toggle");
 const COLUMN_PREFERENCES_KEY = "keldric-gaming-hidden-columns-v1";
+const PAGE_SIZE = 200;
 
 let table = null;
 let searchableFields = [];
@@ -18,6 +19,17 @@ const columnFilterStates = new Map();
 const columnFilterControls = new Map();
 let activeValueMenu = null;
 let valueMenuElement = null;
+let databaseHeaders = [];
+let featuredRows = [];
+let restOffset = 0;
+let restCount = 0;
+let totalRecordCount = 0;
+let restExhausted = false;
+let restRequest = null;
+let queryGeneration = 0;
+let queryTimer = null;
+let filteredView = false;
+const facetCache = new Map();
 
 function loadHiddenColumns() {
   try {
@@ -44,7 +56,7 @@ function setStatus(message, isError) {
   statusElement.classList.toggle("error", Boolean(isError));
 }
 
-function loadDatabase() {
+function loadDatabase(parameters) {
   return new Promise(function (resolve, reject) {
     const callbackName = "kgDatabase_" + Date.now() + "_" + Math.random().toString(36).slice(2);
     const script = document.createElement("script");
@@ -76,7 +88,10 @@ function loadDatabase() {
     script.onerror = function () {
       finish(new Error("The Apps Script endpoint could not be loaded. Check that the web app deployment is active and accessible."));
     };
-    script.src = API_URL + "?callback=" + encodeURIComponent(callbackName) + "&_=" + Date.now();
+    const query = new URLSearchParams(parameters || {});
+    query.set("callback", callbackName);
+    query.set("_", String(Date.now()));
+    script.src = API_URL + "?" + query.toString();
     document.head.appendChild(script);
   });
 }
@@ -182,6 +197,7 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
       notesOnly: state.notesOnly,
     });
     updateChoicesButton(choicesButton, state, field);
+    scheduleRemoteQuery();
   }
 
   input.addEventListener("input", commitFilter);
@@ -211,17 +227,16 @@ function combinedColumnHeaderFilter(filterValue, cellValue, rowData) {
 }
 
 function getColumnValueOptions(field) {
-  const counts = new Map();
-  databaseRows.forEach(function (row) {
-    const value = row[field] == null ? "" : String(row[field]);
-    counts.set(value, (counts.get(value) || 0) + 1);
+  if (facetCache.has(field)) return facetCache.get(field);
+  const request = loadDatabase({ mode: "facets", field: field }).then(function (payload) {
+    if (!Array.isArray(payload.options)) throw new Error("The endpoint returned invalid filter choices.");
+    return payload.options;
+  }).catch(function (error) {
+    facetCache.delete(field);
+    throw error;
   });
-
-  return Array.from(counts.entries()).map(function (entry) {
-    return { value: entry[0], count: entry[1] };
-  }).sort(function (a, b) {
-    return (a.value || "").localeCompare(b.value || "", undefined, { sensitivity: "base" });
-  });
+  facetCache.set(field, request);
+  return request;
 }
 
 function updateChoicesButton(button, state, field) {
@@ -365,14 +380,16 @@ function ensureColumnValueMenu() {
 
 function openColumnValueMenu(field, title, button, success) {
   const menu = ensureColumnValueMenu();
-  activeValueMenu = {
+  const menuState = {
     field: field,
     title: title,
     button: button,
     success: success,
     state: getColumnFilterState(field),
-    options: getColumnValueOptions(field),
+    options: [],
+    loading: true,
   };
+  activeValueMenu = menuState;
 
   menu.querySelector(".column-value-menu-title").textContent = "Filter: " + title;
   menu.querySelector(".column-value-menu-search").value = "";
@@ -385,6 +402,17 @@ function openColumnValueMenu(field, title, button, success) {
   renderColumnValueOptions();
   positionColumnValueMenu();
   menu.querySelector(".column-value-menu-search").focus();
+
+  getColumnValueOptions(field).then(function (options) {
+    if (activeValueMenu !== menuState) return;
+    menuState.options = options;
+    menuState.loading = false;
+    renderColumnValueOptions();
+  }).catch(function () {
+    if (activeValueMenu !== menuState) return;
+    menuState.loading = false;
+    renderColumnValueOptions();
+  });
 }
 
 function renderColumnValueOptions() {
@@ -395,13 +423,17 @@ function renderColumnValueOptions() {
   const list = menu.querySelector(".column-value-menu-list");
   const message = menu.querySelector(".column-value-menu-message");
   const selected = new Set(activeValueMenu.state.selectedValues);
+  list.replaceChildren();
+  if (activeValueMenu.loading) {
+    message.textContent = "";
+    return;
+  }
   const matches = activeValueMenu.options.filter(function (option) {
     const label = option.value === "" ? "(blank)" : option.value;
     return label.toLocaleLowerCase().includes(search);
   });
   const visible = matches.slice(0, 250);
 
-  list.replaceChildren();
   visible.forEach(function (option) {
     const label = document.createElement("label");
     label.className = "column-value-choice";
@@ -441,6 +473,7 @@ function commitActiveValueMenu() {
     notesOnly: state.notesOnly,
   });
   updateChoicesButton(activeValueMenu.button, state, activeValueMenu.title);
+  scheduleRemoteQuery();
 }
 
 function positionColumnValueMenu() {
@@ -486,6 +519,40 @@ function clearColumnFilters() {
     updateChoicesButton(control.button, getColumnFilterState(field), field);
   });
   closeColumnValueMenu(false);
+}
+
+function normalizeRows(rows, headers) {
+  return rows.filter(Array.isArray).map(function (row) {
+    const record = {};
+    headers.forEach(function (_header, index) {
+      const cell = row[index];
+      const cellObject = cell && typeof cell === "object" ? cell : { text: cell, url: null };
+      record["c" + index] = cellObject.text == null ? "" : String(cellObject.text);
+      if (LINK_COLUMNS.has(index)) record["url" + index] = cellObject.url || "";
+      if (index === 0) record.note0 = String(cellObject.note || "");
+    });
+    return record;
+  });
+}
+
+function sortDefaultRows(data) {
+  function videoLinkPriority(record) {
+    const label = String(record.c1 || "").trim();
+    const url = String(record.url1 || "").trim();
+    if (/youtube|youtu\.be/i.test(label + " " + url)) return 0;
+    if (label || url) return 1;
+    return 2;
+  }
+
+  data.sort(function (a, b) {
+    const priorityDifference = videoLinkPriority(a) - videoLinkPriority(b);
+    if (priorityDifference !== 0) return priorityDifference;
+    return String(a.c0 || "").localeCompare(String(b.c0 || ""), undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+  });
+  return data;
 }
 
 function normalizeResponse(payload) {
@@ -554,36 +621,7 @@ function normalizeResponse(payload) {
     return definition;
   });
 
-  const data = payload.rows.filter(Array.isArray).map(function (row) {
-    const record = {};
-    payload.headers.forEach(function (_header, index) {
-      const cell = row[index];
-      const cellObject = cell && typeof cell === "object" ? cell : { text: cell, url: null };
-      record["c" + index] = cellObject.text == null ? "" : String(cellObject.text);
-      if (LINK_COLUMNS.has(index)) record["url" + index] = cellObject.url || "";
-      if (index === 0) record.note0 = String(cellObject.note || "");
-    });
-    return record;
-  });
-
-  // Establish the default order before Tabulator initializes. This avoids
-  // multi-sort precedence differences: YouTube-linked games first, then names A-Z.
-  function videoLinkPriority(record) {
-    const label = String(record.c1 || "").trim();
-    const url = String(record.url1 || "").trim();
-    if (/youtube|youtu\.be/i.test(label + " " + url)) return 0;
-    if (label || url) return 1;
-    return 2;
-  }
-
-  data.sort(function (a, b) {
-    const priorityDifference = videoLinkPriority(a) - videoLinkPriority(b);
-    if (priorityDifference !== 0) return priorityDifference;
-    return String(a.c0 || "").localeCompare(String(b.c0 || ""), undefined, {
-      sensitivity: "base",
-      numeric: true,
-    });
-  });
+  const data = sortDefaultRows(normalizeRows(payload.rows, payload.headers));
 
   databaseRows = data;
   return { columns: columns, data: data };
@@ -604,6 +642,99 @@ function applyGlobalSearch() {
     table.clearFilter(); // Keeps the individual column header filters.
   } else {
     table.setFilter(globalSearchFilter);
+  }
+  scheduleRemoteQuery();
+}
+
+function activeColumnFilters() {
+  const filters = [];
+  columnFilterStates.forEach(function (state, field) {
+    if (state.query || state.selectedValues.length || state.notesOnly) {
+      filters.push({
+        field: field,
+        query: state.query || "",
+        selectedValues: state.selectedValues.slice(),
+        notesOnly: Boolean(state.notesOnly),
+      });
+    }
+  });
+  return filters;
+}
+
+function scheduleRemoteQuery() {
+  if (!table) return;
+  if (queryTimer) window.clearTimeout(queryTimer);
+  const query = searchElement.value.trim();
+  const filters = activeColumnFilters();
+  const generation = ++queryGeneration;
+  const hasQuery = Boolean(query || filters.length);
+
+  if (!hasQuery) {
+    filteredView = false;
+    restOffset = 0;
+    restExhausted = restCount === 0;
+    databaseRows = featuredRows;
+    table.replaceData(featuredRows);
+    countElement.textContent = totalRecordCount.toLocaleString() + " games";
+    return;
+  }
+
+  filteredView = true;
+  queryTimer = window.setTimeout(function () {
+    loadMatchingRows(query, filters, generation).catch(function (error) {
+      if (generation !== queryGeneration) return;
+      setStatus("Could not load matching games. " + error.message, true);
+    });
+  }, 250);
+}
+
+async function loadMatchingRows(query, filters, generation) {
+  const payload = await loadDatabase({
+    mode: "search",
+    q: query,
+    filters: JSON.stringify(filters),
+  });
+  if (generation !== queryGeneration) return;
+  if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
+    throw new Error("The endpoint returned invalid search results.");
+  }
+  const matchingRows = normalizeRows(payload.rows, payload.headers);
+  if (generation !== queryGeneration) return;
+  databaseRows = sortDefaultRows(matchingRows);
+  await table.replaceData(databaseRows);
+  countElement.textContent = databaseRows.length.toLocaleString() + " games";
+}
+
+async function loadNextRestPage() {
+  if (!table || filteredView || restExhausted || restRequest) return;
+  const generation = queryGeneration;
+  restRequest = loadDatabase({ mode: "rest", offset: String(restOffset), limit: String(PAGE_SIZE) })
+    .then(async function (payload) {
+      if (generation !== queryGeneration || filteredView) return;
+      if (!Array.isArray(payload.rows)) throw new Error("The endpoint returned an invalid page of games.");
+      const rows = sortDefaultRows(normalizeRows(payload.rows, databaseHeaders));
+      if (rows.length) {
+        databaseRows = databaseRows.concat(rows);
+        await table.addData(rows, false);
+      }
+      restOffset = Number(payload.nextOffset);
+      restExhausted = Boolean(payload.done) || restOffset >= restCount;
+    })
+    .catch(function (error) {
+      setStatus("Could not load more games. " + error.message, true);
+    })
+    .finally(function () {
+      restRequest = null;
+    });
+  return restRequest;
+}
+
+function loadMoreOnScroll() {
+  if (!table || filteredView || restExhausted || restRequest) return;
+  const holder = document.querySelector("#game-table .tabulator-tableholder");
+  if (!holder) return;
+  if (holder.scrollHeight - holder.scrollTop - holder.clientHeight < 300) {
+    loadNextRestPage();
   }
 }
 
@@ -785,8 +916,15 @@ async function startDatabase() {
   setStatus("Loading game database…", false);
 
   try {
-    const payload = await loadDatabase();
+    const payload = await loadDatabase({ mode: "featured" });
+    databaseHeaders = payload.headers;
     const normalized = normalizeResponse(payload);
+    featuredRows = normalized.data;
+    databaseRows = featuredRows;
+    totalRecordCount = Number(payload.totalRecords) || featuredRows.length;
+    restCount = Number(payload.restRecords) || 0;
+    restOffset = 0;
+    restExhausted = restCount === 0;
 
     table = new window.Tabulator("#game-table", {
       data: normalized.data,
@@ -799,12 +937,14 @@ async function startDatabase() {
     });
 
     addColumnPicker(normalized.columns);
+    table.on("scrollVertical", loadMoreOnScroll);
 
     searchElement.addEventListener("input", applyGlobalSearch);
     clearButton.addEventListener("click", function () {
       searchElement.value = "";
       clearColumnFilters();
       table.clearFilter(true);
+      scheduleRemoteQuery();
     });
 
     const recordCount = Number(payload.totalRecords);
