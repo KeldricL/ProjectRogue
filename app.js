@@ -710,7 +710,10 @@ async function startDatabase() {
       movableColumns: true,
       movableRows: false,
       placeholder: "No games match these filters.",
-      initialSort: [{ column: "c1", dir: "asc" }],
+      initialSort: [
+        { column: "c1", dir: "asc" }, // Video links first; populated links sort ahead of blanks.
+        { column: "c0", dir: "asc" }, // Alphabetize game names within each Video Link group.
+      ],
     });
 
     addColumnPicker(normalized.columns);
