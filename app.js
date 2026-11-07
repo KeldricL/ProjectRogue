@@ -12,7 +12,12 @@ const COLUMN_PREFERENCES_KEY = "keldric-gaming-hidden-columns-v1";
 
 let table = null;
 let searchableFields = [];
+let databaseRows = [];
 let hiddenColumnFields = loadHiddenColumns();
+const columnFilterStates = new Map();
+const columnFilterControls = new Map();
+let activeValueMenu = null;
+let valueMenuElement = null;
 
 function loadHiddenColumns() {
   try {
@@ -114,6 +119,320 @@ function linkFormatter(cell) {
   return anchor;
 }
 
+function getColumnFilterState(field) {
+  if (!columnFilterStates.has(field)) {
+    columnFilterStates.set(field, { query: "", selectedValues: [] });
+  }
+  return columnFilterStates.get(field);
+}
+
+function createColumnHeaderFilter(cell, _onRendered, success) {
+  const column = cell.getColumn();
+  const field = column.getField();
+  const title = column.getDefinition().title;
+  const state = getColumnFilterState(field);
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "column-filter-control";
+
+  const input = document.createElement("input");
+  input.type = "search";
+  input.className = "column-filter-text";
+  input.placeholder = "Filter…";
+  input.setAttribute("aria-label", "Filter " + title);
+  input.autocomplete = "off";
+  input.value = state.query;
+
+  const choicesButton = document.createElement("button");
+  choicesButton.type = "button";
+  choicesButton.className = "column-filter-choices";
+  choicesButton.textContent = "▾";
+  choicesButton.title = "Choose values for " + title;
+  choicesButton.setAttribute("aria-label", "Choose values for " + title);
+  choicesButton.setAttribute("aria-haspopup", "dialog");
+  choicesButton.setAttribute("aria-expanded", "false");
+
+  function commitFilter() {
+    state.query = input.value;
+    success({ query: state.query, selectedValues: state.selectedValues.slice() });
+    updateChoicesButton(choicesButton, state, field);
+  }
+
+  input.addEventListener("input", commitFilter);
+  choicesButton.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    openColumnValueMenu(field, title, choicesButton, success);
+  });
+
+  wrapper.append(input, choicesButton);
+  columnFilterControls.set(field, { input: input, button: choicesButton, success: success });
+  updateChoicesButton(choicesButton, state, field);
+  return wrapper;
+}
+
+function combinedColumnHeaderFilter(filterValue, cellValue) {
+  if (!filterValue) return true;
+
+  const value = cellValue == null ? "" : String(cellValue);
+  const query = String(filterValue.query || "").trim().toLocaleLowerCase();
+  const selectedValues = Array.isArray(filterValue.selectedValues) ? filterValue.selectedValues : [];
+
+  if (query && !value.toLocaleLowerCase().includes(query)) return false;
+  if (selectedValues.length && !selectedValues.includes(value)) return false;
+  return true;
+}
+
+function getColumnValueOptions(field) {
+  const counts = new Map();
+  databaseRows.forEach(function (row) {
+    const value = row[field] == null ? "" : String(row[field]);
+    counts.set(value, (counts.get(value) || 0) + 1);
+  });
+
+  return Array.from(counts.entries()).map(function (entry) {
+    return { value: entry[0], count: entry[1] };
+  }).sort(function (a, b) {
+    return (a.value || "").localeCompare(b.value || "", undefined, { sensitivity: "base" });
+  });
+}
+
+function updateChoicesButton(button, state, field) {
+  const active = state.selectedValues.length > 0;
+  button.classList.toggle("is-active", active);
+  button.setAttribute("aria-pressed", String(active));
+  if (active) {
+    button.title = state.selectedValues.length + " values selected for " + field + "; change choices";
+  } else {
+    button.title = "Choose values for " + field;
+  }
+}
+
+function ensureColumnValueMenu() {
+  if (valueMenuElement) return valueMenuElement;
+
+  const menu = document.createElement("div");
+  menu.className = "column-value-menu";
+  menu.hidden = true;
+  menu.setAttribute("role", "dialog");
+  menu.setAttribute("aria-label", "Filter column values");
+
+  const headingRow = document.createElement("div");
+  headingRow.className = "column-value-menu-heading";
+  const title = document.createElement("strong");
+  title.className = "column-value-menu-title";
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "column-value-menu-close";
+  closeButton.textContent = "×";
+  closeButton.setAttribute("aria-label", "Close choices");
+  headingRow.append(title, closeButton);
+
+  const search = document.createElement("input");
+  search.type = "search";
+  search.className = "column-value-menu-search";
+  search.placeholder = "Find a value…";
+  search.setAttribute("aria-label", "Find a value in this column");
+  search.autocomplete = "off";
+
+  const actions = document.createElement("div");
+  actions.className = "column-value-menu-actions";
+  const selectAllButton = document.createElement("button");
+  selectAllButton.type = "button";
+  selectAllButton.textContent = "Select all";
+  const clearChoicesButton = document.createElement("button");
+  clearChoicesButton.type = "button";
+  clearChoicesButton.textContent = "Clear choices";
+  actions.append(selectAllButton, clearChoicesButton);
+
+  const list = document.createElement("div");
+  list.className = "column-value-menu-list";
+  list.setAttribute("role", "group");
+
+  const message = document.createElement("div");
+  message.className = "column-value-menu-message";
+  message.setAttribute("aria-live", "polite");
+
+  const footer = document.createElement("div");
+  footer.className = "column-value-menu-footer";
+  const selectedCount = document.createElement("span");
+  selectedCount.className = "column-value-menu-selected-count";
+  const doneButton = document.createElement("button");
+  doneButton.type = "button";
+  doneButton.className = "column-value-menu-done";
+  doneButton.textContent = "Done";
+  footer.append(selectedCount, doneButton);
+
+  menu.append(headingRow, search, actions, list, message, footer);
+  document.body.appendChild(menu);
+  valueMenuElement = menu;
+
+  search.addEventListener("input", renderColumnValueOptions);
+  list.addEventListener("change", function (event) {
+    if (!activeValueMenu || !event.target.matches("input[type='checkbox']")) return;
+    const value = event.target.value;
+    const selected = new Set(activeValueMenu.state.selectedValues);
+    if (event.target.checked) selected.add(value);
+    else selected.delete(value);
+    activeValueMenu.state.selectedValues = Array.from(selected);
+    commitActiveValueMenu();
+    renderColumnValueOptions();
+  });
+
+  selectAllButton.addEventListener("click", function () {
+    if (!activeValueMenu) return;
+    activeValueMenu.state.selectedValues = activeValueMenu.options.map(function (item) { return item.value; });
+    commitActiveValueMenu();
+    renderColumnValueOptions();
+  });
+
+  clearChoicesButton.addEventListener("click", function () {
+    if (!activeValueMenu) return;
+    activeValueMenu.state.selectedValues = [];
+    commitActiveValueMenu();
+    renderColumnValueOptions();
+  });
+
+  function close() {
+    closeColumnValueMenu(true);
+  }
+  closeButton.addEventListener("click", close);
+  doneButton.addEventListener("click", close);
+
+  document.addEventListener("pointerdown", function (event) {
+    if (!activeValueMenu) return;
+    if (menu.contains(event.target) || activeValueMenu.button.contains(event.target)) return;
+    closeColumnValueMenu(false);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && activeValueMenu) closeColumnValueMenu(true);
+  });
+
+  document.addEventListener("scroll", function (event) {
+    if (!activeValueMenu || menu.contains(event.target)) return;
+    positionColumnValueMenu();
+  }, true);
+  window.addEventListener("resize", positionColumnValueMenu);
+
+  return menu;
+}
+
+function openColumnValueMenu(field, title, button, success) {
+  const menu = ensureColumnValueMenu();
+  activeValueMenu = {
+    field: field,
+    title: title,
+    button: button,
+    success: success,
+    state: getColumnFilterState(field),
+    options: getColumnValueOptions(field),
+  };
+
+  menu.querySelector(".column-value-menu-title").textContent = "Filter: " + title;
+  menu.querySelector(".column-value-menu-search").value = "";
+  menu.hidden = false;
+  button.setAttribute("aria-expanded", "true");
+  renderColumnValueOptions();
+  positionColumnValueMenu();
+  menu.querySelector(".column-value-menu-search").focus();
+}
+
+function renderColumnValueOptions() {
+  if (!activeValueMenu || !valueMenuElement) return;
+
+  const menu = valueMenuElement;
+  const search = menu.querySelector(".column-value-menu-search").value.trim().toLocaleLowerCase();
+  const list = menu.querySelector(".column-value-menu-list");
+  const message = menu.querySelector(".column-value-menu-message");
+  const selected = new Set(activeValueMenu.state.selectedValues);
+  const matches = activeValueMenu.options.filter(function (option) {
+    const label = option.value === "" ? "(blank)" : option.value;
+    return label.toLocaleLowerCase().includes(search);
+  });
+  const visible = matches.slice(0, 250);
+
+  list.replaceChildren();
+  visible.forEach(function (option) {
+    const label = document.createElement("label");
+    label.className = "column-value-choice";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = option.value;
+    checkbox.checked = selected.has(option.value);
+    const text = document.createElement("span");
+    text.className = "column-value-choice-label";
+    text.textContent = option.value === "" ? "(blank)" : option.value;
+    const count = document.createElement("span");
+    count.className = "column-value-choice-count";
+    count.textContent = option.count.toLocaleString();
+    label.append(checkbox, text, count);
+    list.appendChild(label);
+  });
+
+  if (!matches.length) {
+    message.textContent = "No values match that search.";
+  } else if (matches.length > visible.length) {
+    message.textContent = "Showing the first 250 of " + matches.length.toLocaleString() + " values. Search to narrow the list.";
+  } else {
+    message.textContent = matches.length.toLocaleString() + " values";
+  }
+
+  menu.querySelector(".column-value-menu-selected-count").textContent =
+    selected.size ? selected.size.toLocaleString() + " selected" : "No value filter";
+}
+
+function commitActiveValueMenu() {
+  if (!activeValueMenu) return;
+  const state = activeValueMenu.state;
+  activeValueMenu.success({ query: state.query, selectedValues: state.selectedValues.slice() });
+  updateChoicesButton(activeValueMenu.button, state, activeValueMenu.title);
+}
+
+function positionColumnValueMenu() {
+  if (!activeValueMenu || !valueMenuElement || valueMenuElement.hidden) return;
+  const menu = valueMenuElement;
+
+  if (window.matchMedia("(max-width: 600px)").matches) {
+    menu.style.left = "";
+    menu.style.top = "";
+    menu.style.transform = "";
+    return;
+  }
+
+  menu.style.transform = "none";
+  const rect = activeValueMenu.button.getBoundingClientRect();
+  const width = menu.offsetWidth;
+  const height = menu.offsetHeight;
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+  let top = rect.bottom + 6;
+  if (top + height > window.innerHeight - 8) top = rect.top - height - 6;
+  top = Math.max(8, Math.min(top, window.innerHeight - height - 8));
+  menu.style.left = left + "px";
+  menu.style.top = top + "px";
+}
+
+function closeColumnValueMenu(returnFocus) {
+  if (!activeValueMenu || !valueMenuElement) return;
+  const button = activeValueMenu.button;
+  valueMenuElement.hidden = true;
+  button.setAttribute("aria-expanded", "false");
+  activeValueMenu = null;
+  if (returnFocus) button.focus();
+}
+
+function clearColumnFilters() {
+  columnFilterStates.forEach(function (state) {
+    state.query = "";
+    state.selectedValues = [];
+  });
+  columnFilterControls.forEach(function (control, field) {
+    control.input.value = "";
+    updateChoicesButton(control.button, getColumnFilterState(field), field);
+  });
+  closeColumnValueMenu(false);
+}
+
 function normalizeResponse(payload) {
   if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
     throw new Error("The endpoint response must contain headers and rows arrays.");
@@ -132,8 +451,8 @@ function normalizeResponse(payload) {
         : String(header),
       field: "c" + index,
       visible: index === 0 || !hiddenColumnFields.has("c" + index),
-      headerFilter: "input",
-      headerFilterPlaceholder: "Filter…",
+      headerFilter: createColumnHeaderFilter,
+      headerFilterFunc: combinedColumnHeaderFilter,
       headerSort: true,
       sorter: "string",
       minWidth: index === 0
@@ -180,6 +499,7 @@ function normalizeResponse(payload) {
     return record;
   });
 
+  databaseRows = data;
   return { columns: columns, data: data };
 }
 
@@ -398,6 +718,7 @@ async function startDatabase() {
     searchElement.addEventListener("input", applyGlobalSearch);
     clearButton.addEventListener("click", function () {
       searchElement.value = "";
+      clearColumnFilters();
       table.clearFilter(true);
     });
 
