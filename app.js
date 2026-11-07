@@ -497,6 +497,25 @@ function normalizeResponse(payload) {
     return record;
   });
 
+  // Establish the default order before Tabulator initializes. This avoids
+  // multi-sort precedence differences: YouTube-linked games first, then names A-Z.
+  function videoLinkPriority(record) {
+    const label = String(record.c1 || "").trim();
+    const url = String(record.url1 || "").trim();
+    if (/youtube|youtu\.be/i.test(label + " " + url)) return 0;
+    if (label || url) return 1;
+    return 2;
+  }
+
+  data.sort(function (a, b) {
+    const priorityDifference = videoLinkPriority(a) - videoLinkPriority(b);
+    if (priorityDifference !== 0) return priorityDifference;
+    return String(a.c0 || "").localeCompare(String(b.c0 || ""), undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+  });
+
   databaseRows = data;
   return { columns: columns, data: data };
 }
@@ -708,10 +727,6 @@ async function startDatabase() {
       movableColumns: true,
       movableRows: false,
       placeholder: "No games match these filters.",
-      initialSort: [
-        { column: "c0", dir: "asc" }, // Apply first so names become the secondary sort.
-        { column: "c1", dir: "asc" }, // Applied last, so Video Link presence is the primary grouping.
-      ],
     });
 
     addColumnPicker(normalized.columns);
