@@ -475,12 +475,10 @@ function normalizeResponse(payload) {
         const aHasData = Boolean(aText || aUrl);
         const bHasData = Boolean(bText || bUrl);
 
-        if (aHasData !== bHasData) return aHasData ? -1 : 1;
-
-        const aSortValue = aText || aUrl;
-        const bSortValue = bText || bUrl;
-        return aSortValue.localeCompare(bSortValue, undefined, { sensitivity: "base" })
-          || aUrl.localeCompare(bUrl, undefined, { sensitivity: "base" });
+        // This is a grouping sort: rows with Video Links first, blanks last.
+        // Return 0 within each group so the secondary Game Name sort can order them.
+        if (aHasData === bHasData) return 0;
+        return aHasData ? -1 : 1;
       };
     }
 
