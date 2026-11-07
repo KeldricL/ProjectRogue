@@ -709,8 +709,8 @@ async function startDatabase() {
       movableRows: false,
       placeholder: "No games match these filters.",
       initialSort: [
-        { column: "c1", dir: "asc" }, // Video links first; populated links sort ahead of blanks.
-        { column: "c0", dir: "asc" }, // Alphabetize game names within each Video Link group.
+        { column: "c0", dir: "asc" }, // Apply first so names become the secondary sort.
+        { column: "c1", dir: "asc" }, // Applied last, so Video Link presence is the primary grouping.
       ],
     });
 
