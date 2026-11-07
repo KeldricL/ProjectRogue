@@ -183,6 +183,37 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .column-value-menu-footer { padding-top: 8px; }
 .column-value-menu-selected-count { color: #bac7c0; font-size: .8rem; }
 .column-value-menu-done { flex: 0 0 auto; }
+.game-name-with-note { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.game-name-note-text { min-width: 0; }
+.game-note-indicator {
+  display: inline-flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #6dc583;
+  border-radius: 50%;
+  background: #304237;
+  color: #bdf0c8;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: help;
+}
+.game-note-indicator:hover { background: #3c5844; color: #fff; }
+.tabulator-tooltip {
+  max-width: min(380px, 80vw);
+  padding: 9px 12px;
+  border: 1px solid #617568;
+  border-radius: 7px;
+  background: #17201d;
+  color: #f1f5f2;
+  font: inherit;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  box-shadow: 0 8px 24px #0009;
+}
 
 html:fullscreen,
 html:fullscreen body { width: 100%; height: 100%; background: #111416; }

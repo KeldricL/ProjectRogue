@@ -91,6 +91,28 @@ function textFormatter(cell) {
   return makeTextElement(cell.getValue());
 }
 
+function gameNameFormatter(cell) {
+  const gameName = cell.getValue() == null ? "" : String(cell.getValue());
+  const note = String(cell.getRow().getData().note0 || "").trim();
+  if (!note) return makeTextElement(gameName);
+
+  const wrapper = document.createElement("span");
+  wrapper.className = "game-name-with-note";
+
+  const name = document.createElement("span");
+  name.className = "game-name-note-text";
+  name.textContent = gameName;
+
+  const indicator = document.createElement("span");
+  indicator.className = "game-note-indicator";
+  indicator.textContent = "i";
+  indicator.title = "This game has a note. Hover to read it.";
+  indicator.setAttribute("aria-label", "This game has a note. Hover to read it.");
+
+  wrapper.append(name, indicator);
+  return wrapper;
+}
+
 function linkFormatter(cell) {
   const fieldIndex = Number(cell.getField().slice(1));
   const row = cell.getRow().getData();
@@ -461,8 +483,21 @@ function normalizeResponse(payload) {
       frozen: index === 0,
       hozAlign: index === 0 ? "left" : "center",
       headerHozAlign: index === 0 ? "left" : "center",
-      formatter: LINK_COLUMNS.has(index) ? linkFormatter : textFormatter,
+      formatter: index === 0
+        ? gameNameFormatter
+        : (LINK_COLUMNS.has(index) ? linkFormatter : textFormatter),
     };
+
+    if (index === 0) {
+      definition.tooltip = function (_event, cell) {
+        const note = String(cell.getRow().getData().note0 || "").trim();
+        if (!note) return false;
+        const tooltip = document.createElement("div");
+        tooltip.className = "game-note-tooltip-content";
+        tooltip.textContent = note;
+        return tooltip;
+      };
+    }
 
     if (index === 1) {
       definition.sorter = function (a, b, aRow, bRow) {
@@ -493,6 +528,7 @@ function normalizeResponse(payload) {
       const cellObject = cell && typeof cell === "object" ? cell : { text: cell, url: null };
       record["c" + index] = cellObject.text == null ? "" : String(cellObject.text);
       if (LINK_COLUMNS.has(index)) record["url" + index] = cellObject.url || "";
+      if (index === 0) record.note0 = String(cellObject.note || "");
     });
     return record;
   });
