@@ -143,7 +143,7 @@ function linkFormatter(cell) {
 
 function getColumnFilterState(field) {
   if (!columnFilterStates.has(field)) {
-    columnFilterStates.set(field, { query: "", selectedValues: [] });
+    columnFilterStates.set(field, { query: "", selectedValues: [], notesOnly: false });
   }
   return columnFilterStates.get(field);
 }
@@ -176,7 +176,11 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
 
   function commitFilter() {
     state.query = input.value;
-    success({ query: state.query, selectedValues: state.selectedValues.slice() });
+    success({
+      query: state.query,
+      selectedValues: state.selectedValues.slice(),
+      notesOnly: state.notesOnly,
+    });
     updateChoicesButton(choicesButton, state, field);
   }
 
@@ -193,7 +197,7 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
   return wrapper;
 }
 
-function combinedColumnHeaderFilter(filterValue, cellValue) {
+function combinedColumnHeaderFilter(filterValue, cellValue, rowData) {
   if (!filterValue) return true;
 
   const value = cellValue == null ? "" : String(cellValue);
@@ -202,6 +206,7 @@ function combinedColumnHeaderFilter(filterValue, cellValue) {
 
   if (query && !value.toLocaleLowerCase().includes(query)) return false;
   if (selectedValues.length && !selectedValues.includes(value)) return false;
+  if (filterValue.notesOnly && !String(rowData && rowData.note0 || "").trim()) return false;
   return true;
 }
 
@@ -220,11 +225,15 @@ function getColumnValueOptions(field) {
 }
 
 function updateChoicesButton(button, state, field) {
-  const active = state.selectedValues.length > 0;
+  const active = state.selectedValues.length > 0 || state.notesOnly;
   button.classList.toggle("is-active", active);
   button.setAttribute("aria-pressed", String(active));
   if (active) {
-    button.title = state.selectedValues.length + " values selected for " + field + "; change choices";
+    const selectedMessage = state.selectedValues.length
+      ? state.selectedValues.length + " values selected"
+      : "";
+    const notesMessage = state.notesOnly ? "games with notes only" : "";
+    button.title = [selectedMessage, notesMessage].filter(Boolean).join("; ") + " for " + field + "; change choices";
   } else {
     button.title = "Choose values for " + field;
   }
@@ -257,6 +266,14 @@ function ensureColumnValueMenu() {
   search.setAttribute("aria-label", "Find a value in this column");
   search.autocomplete = "off";
 
+  const notesOnlyLabel = document.createElement("label");
+  notesOnlyLabel.className = "column-value-notes-only";
+  const notesOnlyCheckbox = document.createElement("input");
+  notesOnlyCheckbox.type = "checkbox";
+  const notesOnlyText = document.createElement("span");
+  notesOnlyText.textContent = "Only games with notes";
+  notesOnlyLabel.append(notesOnlyCheckbox, notesOnlyText);
+
   const actions = document.createElement("div");
   actions.className = "column-value-menu-actions";
   const selectAllButton = document.createElement("button");
@@ -285,11 +302,17 @@ function ensureColumnValueMenu() {
   doneButton.textContent = "Done";
   footer.append(selectedCount, doneButton);
 
-  menu.append(headingRow, search, actions, list, message, footer);
+  menu.append(headingRow, search, notesOnlyLabel, actions, list, message, footer);
   document.body.appendChild(menu);
   valueMenuElement = menu;
 
   search.addEventListener("input", renderColumnValueOptions);
+  notesOnlyCheckbox.addEventListener("change", function () {
+    if (!activeValueMenu) return;
+    activeValueMenu.state.notesOnly = notesOnlyCheckbox.checked;
+    commitActiveValueMenu();
+    renderColumnValueOptions();
+  });
   list.addEventListener("change", function (event) {
     if (!activeValueMenu || !event.target.matches("input[type='checkbox']")) return;
     const value = event.target.value;
@@ -353,6 +376,10 @@ function openColumnValueMenu(field, title, button, success) {
 
   menu.querySelector(".column-value-menu-title").textContent = "Filter: " + title;
   menu.querySelector(".column-value-menu-search").value = "";
+  const notesOnlyLabel = menu.querySelector(".column-value-notes-only");
+  const notesOnlyCheckbox = notesOnlyLabel.querySelector("input");
+  notesOnlyLabel.hidden = field !== "c0";
+  notesOnlyCheckbox.checked = field === "c0" && activeValueMenu.state.notesOnly;
   menu.hidden = false;
   button.setAttribute("aria-expanded", "true");
   renderColumnValueOptions();
@@ -400,14 +427,19 @@ function renderColumnValueOptions() {
     message.textContent = matches.length.toLocaleString() + " values";
   }
 
+  const selectedText = selected.size ? selected.size.toLocaleString() + " selected" : "No value filter";
   menu.querySelector(".column-value-menu-selected-count").textContent =
-    selected.size ? selected.size.toLocaleString() + " selected" : "No value filter";
+    activeValueMenu.state.notesOnly ? selectedText + " · notes only" : selectedText;
 }
 
 function commitActiveValueMenu() {
   if (!activeValueMenu) return;
   const state = activeValueMenu.state;
-  activeValueMenu.success({ query: state.query, selectedValues: state.selectedValues.slice() });
+  activeValueMenu.success({
+    query: state.query,
+    selectedValues: state.selectedValues.slice(),
+    notesOnly: state.notesOnly,
+  });
   updateChoicesButton(activeValueMenu.button, state, activeValueMenu.title);
 }
 
@@ -447,6 +479,7 @@ function clearColumnFilters() {
   columnFilterStates.forEach(function (state) {
     state.query = "";
     state.selectedValues = [];
+    state.notesOnly = false;
   });
   columnFilterControls.forEach(function (control, field) {
     control.input.value = "";

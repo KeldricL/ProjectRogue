@@ -152,6 +152,28 @@ button:hover { border-color: #6dc583; background: #30393a; }
   margin: 10px !important;
   padding: 7px 9px !important;
 }
+.column-value-notes-only[hidden] { display: none !important; }
+.column-value-notes-only {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  margin: 0 10px 8px;
+  padding: 5px 8px;
+  border: 1px solid #405047;
+  border-radius: 6px;
+  background: #202927;
+  color: #e6ecea;
+  font-size: .84rem;
+  cursor: pointer;
+}
+.column-value-notes-only:hover { background: #293832; }
+.column-value-notes-only input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #6dc583;
+}
 .column-value-menu-actions { display: flex; gap: 8px; padding: 0 10px 8px; }
 .column-value-menu-actions button,
 .column-value-menu-done { min-height: 34px; padding: 5px 9px; font-size: .82rem; }
