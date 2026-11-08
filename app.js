@@ -508,6 +508,7 @@ function normalizeResponse(payload) {
       visible: index === 0 || !hiddenColumnFields.has("c" + index),
       headerFilter: createColumnHeaderFilter,
       headerFilterFunc: combinedColumnHeaderFilter,
+      headerFilterLiveFilter: false,
       headerSort: true,
       sorter: "string",
       minWidth: index === 0
