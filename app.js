@@ -24,6 +24,10 @@ let gemstationModeActive = false;
 let columnPickerToggleButton = null;
 let columnPickerMenu = null;
 let syncColumnPickerCheckboxes = function () {};
+let filteredWidthSnapshot = null;
+let filteredWidthQueue = Promise.resolve();
+let filteredWidthFrame = 0;
+let filteredWidthVersion = 0;
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
 let activeValueMenu = null;
@@ -638,6 +642,79 @@ function applyGlobalSearch() {
   }
 }
 
+function hasActiveUserFilters() {
+  if (gemstationModeActive || searchElement.value.trim()) return true;
+  return Array.from(columnFilterStates.values()).some(function (state) {
+    return Boolean(
+      String(state.query || "").trim() ||
+      (Array.isArray(state.selectedValues) && state.selectedValues.length) ||
+      state.notesOnly
+    );
+  });
+}
+
+function resizeColumnsForFilteredResults() {
+  if (!table) return;
+  const shouldFit = hasActiveUserFilters();
+  const version = ++filteredWidthVersion;
+  const columns = table.getColumns();
+
+  if (shouldFit && !filteredWidthSnapshot) {
+    filteredWidthSnapshot = new Map();
+    columns.forEach(function (column) {
+      const definition = column.getDefinition();
+      filteredWidthSnapshot.set(column.getField(), {
+        width: column.getWidth(),
+        minWidth: definition.minWidth,
+      });
+    });
+    filteredWidthQueue = filteredWidthQueue.catch(function () {}).then(function () {
+      return Promise.all(columns.map(function (column) {
+        return column.updateDefinition({ minWidth: 56 });
+      }));
+    });
+  }
+
+  if (!shouldFit && filteredWidthSnapshot) {
+    const snapshot = filteredWidthSnapshot;
+    filteredWidthSnapshot = null;
+    if (filteredWidthFrame) window.cancelAnimationFrame(filteredWidthFrame);
+    filteredWidthFrame = 0;
+    filteredWidthQueue = filteredWidthQueue.catch(function () {}).then(function () {
+      return Promise.all(table.getColumns().map(function (column) {
+        const original = snapshot.get(column.getField());
+        if (!original) return Promise.resolve();
+        return column.updateDefinition({ minWidth: original.minWidth });
+      }));
+    }).then(function () {
+      if (version !== filteredWidthVersion || filteredWidthSnapshot) return;
+      table.getColumns().forEach(function (column) {
+        const original = snapshot.get(column.getField());
+        if (original && Number(original.width) > 0) column.setWidth(original.width);
+      });
+      table.redraw(true);
+    });
+    return;
+  }
+
+  if (shouldFit) {
+    filteredWidthQueue.then(function () {
+      if (version !== filteredWidthVersion || !filteredWidthSnapshot) return;
+      if (filteredWidthFrame) window.cancelAnimationFrame(filteredWidthFrame);
+      filteredWidthFrame = window.requestAnimationFrame(function () {
+        filteredWidthFrame = 0;
+        if (version !== filteredWidthVersion || !filteredWidthSnapshot) return;
+        table.getColumns().forEach(function (column) {
+          if (column.isVisible()) column.setWidth(true);
+        });
+        table.redraw(true);
+      });
+    }).catch(function (error) {
+      console.warn("Could not resize filtered database columns:", error);
+    });
+  }
+}
+
 function enterGemstationMode() {
   if (!table || gemstationModeActive) return;
   if (!table.getColumn(GEMSTATION_DATE_FIELD)) {
@@ -809,7 +886,10 @@ function addColumnPicker(columns) {
       }
 
       saveHiddenColumns();
-      window.requestAnimationFrame(function () { table.redraw(true); });
+      window.requestAnimationFrame(function () {
+        table.redraw(true);
+        if (hasActiveUserFilters()) resizeColumnsForFilteredResults();
+      });
     });
 
     label.append(checkbox, text);
@@ -838,7 +918,10 @@ function addColumnPicker(columns) {
     });
     saveHiddenColumns();
     syncCheckboxes();
-    window.requestAnimationFrame(function () { table.redraw(true); });
+    window.requestAnimationFrame(function () {
+      table.redraw(true);
+      if (hasActiveUserFilters()) resizeColumnsForFilteredResults();
+    });
   });
 
   doneButton.addEventListener("click", function () {
@@ -891,6 +974,8 @@ async function startDatabase() {
       movableRows: false,
       placeholder: "No games match these filters.",
     });
+
+    table.on("dataFiltered", resizeColumnsForFilteredResults);
 
     addColumnPicker(normalized.columns);
 
