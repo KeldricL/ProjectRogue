@@ -3,6 +3,9 @@
 // This endpoint reads the Master worksheet and returns JSONP for the GitHub Pages site.
 const API_URL = "https://script.google.com/macros/s/AKfycbw_-kRO0YgDvL3n4VQ3xtepP4AZUzVcLoKX7uZc_CS5rMwfihPdWeNZ5QM2PloVx7Jt/exec";
 const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
+const GEMSTATION_TRIGGER = "##gemstation";
+const GEMSTATION_DATE_FIELD = "c46"; // AU, zero-based column index
+const GEMSTATION_VISIBLE_FIELDS = new Set(["c0", "c2", "c3", "c4", "c6", "c42", "c43", GEMSTATION_DATE_FIELD]);
 const statusElement = document.getElementById("status");
 const countElement = document.getElementById("record-count");
 const searchElement = document.getElementById("global-search");
@@ -17,6 +20,10 @@ let isLoading = false;
 let databaseControlsBound = false;
 let databaseRows = [];
 let hiddenColumnFields = loadHiddenColumns();
+let gemstationModeActive = false;
+let columnPickerToggleButton = null;
+let columnPickerMenu = null;
+let syncColumnPickerCheckboxes = function () {};
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
 let activeValueMenu = null;
@@ -508,7 +515,7 @@ function normalizeResponse(payload) {
         ? "Column " + (index + 1)
         : String(header),
       field: "c" + index,
-      visible: index === 0 || !hiddenColumnFields.has("c" + index),
+      visible: index === 0 || (index !== 46 && !hiddenColumnFields.has("c" + index)),
       headerFilter: createColumnHeaderFilter,
       headerFilterFunc: combinedColumnHeaderFilter,
       headerFilterLiveFilter: false,
@@ -551,6 +558,20 @@ function normalizeResponse(payload) {
         // Return 0 within each group so the secondary Game Name sort can order them.
         if (aHasData === bHasData) return 0;
         return aHasData ? -1 : 1;
+      };
+    }
+
+    if (index === 46) {
+      definition.sorter = function (a, b) {
+        const aText = a == null ? "" : String(a).trim();
+        const bText = b == null ? "" : String(b).trim();
+        const aTime = Date.parse(aText);
+        const bTime = Date.parse(bText);
+        const aValid = Number.isFinite(aTime);
+        const bValid = Number.isFinite(bTime);
+        if (aValid && bValid) return aTime - bTime;
+        if (aValid !== bValid) return aValid ? 1 : -1;
+        return aText.localeCompare(bText, undefined, { numeric: true, sensitivity: "base" });
       };
     }
 
@@ -604,11 +625,65 @@ function globalSearchFilter(rowData) {
 
 function applyGlobalSearch() {
   if (!table) return;
+  if (searchElement.value.trim().toLocaleLowerCase() === GEMSTATION_TRIGGER) {
+    enterGemstationMode();
+    return;
+  }
+  if (gemstationModeActive) leaveGemstationMode();
+
   if (searchElement.value.trim() === "") {
     table.clearFilter(); // Keeps the individual column header filters.
   } else {
     table.setFilter(globalSearchFilter);
   }
+}
+
+function enterGemstationMode() {
+  if (!table || gemstationModeActive) return;
+  if (!table.getColumn(GEMSTATION_DATE_FIELD)) {
+    setStatus("The Gemstation view needs the database feed to include Master columns through AU.", true);
+    return;
+  }
+
+  gemstationModeActive = true;
+  clearColumnFilters();
+  table.clearFilter(true);
+  table.getColumns().forEach(function (column) {
+    const field = column.getField();
+    if (GEMSTATION_VISIBLE_FIELDS.has(field)) column.show();
+    else column.hide();
+  });
+  if (columnPickerMenu) columnPickerMenu.hidden = true;
+  if (columnPickerToggleButton) {
+    columnPickerToggleButton.disabled = true;
+    columnPickerToggleButton.setAttribute("aria-expanded", "false");
+  }
+  table.setFilter(function (rowData) {
+    return Boolean(String(rowData[GEMSTATION_DATE_FIELD] || "").trim());
+  });
+  table.setSort(GEMSTATION_DATE_FIELD, "desc");
+  setStatus("Gemstation view: submitted games, newest first.", false);
+}
+
+function leaveGemstationMode() {
+  if (!gemstationModeActive || !table) return;
+  gemstationModeActive = false;
+  table.clearFilter(true);
+  clearColumnFilters();
+  table.clearSort();
+  table.getColumns().forEach(function (column) {
+    const field = column.getField();
+    if (field === "c0" || (field !== GEMSTATION_DATE_FIELD && !hiddenColumnFields.has(field))) column.show();
+    else column.hide();
+  });
+  if (columnPickerToggleButton) columnPickerToggleButton.disabled = false;
+  syncColumnPickerCheckboxes();
+
+  const query = searchElement.value.trim();
+  if (query) table.setFilter(globalSearchFilter);
+  else table.clearFilter();
+  const count = Number(countElement.textContent.replace(/[^0-9]/g, ""));
+  setStatus("Loaded " + (Number.isFinite(count) ? count.toLocaleString() : databaseRows.length.toLocaleString()) + " games from the Master worksheet.", false);
 }
 
 async function toggleFullscreen() {
@@ -658,6 +733,7 @@ function addColumnPicker(columns) {
   toggleButton.textContent = "Choose columns";
   toggleButton.setAttribute("aria-expanded", "false");
   toggleButton.setAttribute("aria-controls", "column-picker-menu");
+  columnPickerToggleButton = toggleButton;
   actionRow.insertBefore(toggleButton, fullscreenButton || null);
 
   const menu = document.createElement("div");
@@ -666,6 +742,7 @@ function addColumnPicker(columns) {
   menu.hidden = true;
   menu.setAttribute("role", "dialog");
   menu.setAttribute("aria-label", "Choose visible columns");
+  columnPickerMenu = menu;
 
   const menuHeader = document.createElement("div");
   menuHeader.className = "column-picker-header";
@@ -696,9 +773,10 @@ function addColumnPicker(columns) {
 
   function syncCheckboxes() {
     checkboxes.forEach(function (entry) {
-      entry.checkbox.checked = entry.field === "c0" || !hiddenColumnFields.has(entry.field);
+      entry.checkbox.checked = entry.field === "c0" || (entry.field !== GEMSTATION_DATE_FIELD && !hiddenColumnFields.has(entry.field));
     });
   }
+  syncColumnPickerCheckboxes = syncCheckboxes;
 
   columns.forEach(function (definition) {
     const field = definition.field;
@@ -707,15 +785,17 @@ function addColumnPicker(columns) {
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = field === "c0" || !hiddenColumnFields.has(field);
-    checkbox.disabled = field === "c0";
+    checkbox.checked = field === "c0" || (field !== GEMSTATION_DATE_FIELD && !hiddenColumnFields.has(field));
+    checkbox.disabled = field === "c0" || field === GEMSTATION_DATE_FIELD;
 
     const text = document.createElement("span");
-    text.textContent = field === "c0" ? definition.title + " (always shown)" : definition.title;
+    text.textContent = field === "c0"
+      ? definition.title + " (always shown)"
+      : (field === GEMSTATION_DATE_FIELD ? definition.title + " (Gemstation view only)" : definition.title);
 
     checkbox.addEventListener("change", function () {
       const column = table.getColumn(field);
-      if (!column || field === "c0") {
+      if (!column || field === "c0" || field === GEMSTATION_DATE_FIELD) {
         checkbox.checked = true;
         return;
       }
@@ -754,7 +834,7 @@ function addColumnPicker(columns) {
   showAllButton.addEventListener("click", function () {
     hiddenColumnFields.clear();
     columns.forEach(function (definition) {
-      if (definition.field !== "c0") table.showColumn(definition.field);
+      if (definition.field !== "c0" && definition.field !== GEMSTATION_DATE_FIELD) table.showColumn(definition.field);
     });
     saveHiddenColumns();
     syncCheckboxes();
@@ -818,9 +898,14 @@ async function startDatabase() {
       searchElement.addEventListener("input", applyGlobalSearch);
       clearButton.addEventListener("click", function () {
         searchElement.value = "";
+      if (gemstationModeActive) {
+        leaveGemstationMode();
+        return;
+      }
         clearColumnFilters();
         table.clearFilter(true);
       });
+    applyGlobalSearch();
       databaseControlsBound = true;
     }
 
