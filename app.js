@@ -7,11 +7,9 @@ const statusElement = document.getElementById("status");
 const countElement = document.getElementById("record-count");
 const searchElement = document.getElementById("global-search");
 const clearButton = document.getElementById("clear-filters");
-const retryButton = document.getElementById("retry-database");
 
 let table = null;
 let searchableFields = [];
-let isLoading = false;
 
 function setStatus(message, isError) {
   statusElement.textContent = message;
@@ -51,22 +49,6 @@ function loadDatabase() {
       finish(new Error("The Apps Script endpoint could not be loaded. Check that the web app deployment is active and accessible."));
     };
     script.src = API_URL + "?callback=" + encodeURIComponent(callbackName) + "&_=" + Date.now();
-    document.head.appendChild(script);
-  });
-}
-
-function loadTableLibrary() {
-  return new Promise(function (resolve, reject) {
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/tabulator-tables@6.5.0/dist/js/tabulator.min.js";
-    script.async = true;
-    script.onload = function () {
-      if (typeof window.Tabulator === "undefined") reject(new Error("The table library did not start."));
-      else resolve();
-    };
-    script.onerror = function () {
-      reject(new Error("The table library could not be loaded. Check your internet connection and try again."));
-    };
     document.head.appendChild(script);
   });
 }
@@ -170,23 +152,9 @@ function applyGlobalSearch() {
 }
 
 async function startDatabase() {
-  if (isLoading) return;
-  isLoading = true;
-  retryButton.hidden = true;
-  retryButton.disabled = true;
-  retryButton.textContent = "Reloading…";
-
   if (typeof window.Tabulator === "undefined") {
-    try {
-      await loadTableLibrary();
-    } catch (error) {
-      setStatus(error.message, true);
-      retryButton.hidden = false;
-      retryButton.disabled = false;
-      retryButton.textContent = "Reload database";
-      isLoading = false;
-      return;
-    }
+    setStatus("The table library did not load. Check your internet connection and refresh.", true);
+    return;
   }
 
   setStatus("Loading game database…", false);
@@ -195,7 +163,6 @@ async function startDatabase() {
     const payload = await loadDatabase();
     const normalized = normalizeResponse(payload);
 
-    if (table) table.destroy();
     table = new window.Tabulator("#game-table", {
       data: normalized.data,
       columns: normalized.columns,
@@ -207,7 +174,11 @@ async function startDatabase() {
       initialSort: [{ column: "c0", dir: "asc" }],
     });
 
-    if (searchElement.value.trim()) table.setFilter(globalSearchFilter);
+    searchElement.addEventListener("input", applyGlobalSearch);
+    clearButton.addEventListener("click", function () {
+      searchElement.value = "";
+      table.clearFilter(true);
+    });
 
     const recordCount = Number(payload.totalRecords);
     const shownCount = Number.isFinite(recordCount) ? recordCount : normalized.data.length;
@@ -215,25 +186,9 @@ async function startDatabase() {
     setStatus("Loaded " + shownCount.toLocaleString() + " games from the Master worksheet.", false);
   } catch (error) {
     console.error("Keldric Gaming database error:", error);
-    if (table) {
-      setStatus("Could not refresh the database. The currently loaded data is still shown. " + error.message, true);
-    } else {
-      countElement.textContent = "";
-      setStatus("Could not load the game database. " + error.message, true);
-    }
-    retryButton.hidden = false;
-  } finally {
-    retryButton.disabled = false;
-    retryButton.textContent = "Reload database";
-    isLoading = false;
+    countElement.textContent = "";
+    setStatus("Could not load the game database. " + error.message, true);
   }
 }
-
-searchElement.addEventListener("input", applyGlobalSearch);
-clearButton.addEventListener("click", function () {
-  searchElement.value = "";
-  if (table) table.clearFilter(true);
-});
-retryButton.addEventListener("click", startDatabase);
 
 startDatabase();
