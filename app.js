@@ -709,6 +709,9 @@ function normalizeResponse(payload) {
       if (LINK_COLUMNS.has(index)) record["url" + index] = cellObject.url || "";
       if (index === 0) record.note0 = String(cellObject.note || "");
     });
+    record._searchText = searchableFields.map(function (field) {
+      return String(record[field] || "").toLocaleLowerCase();
+    }).join("\u0000");
     return record;
   });
 
@@ -738,6 +741,10 @@ function normalizeResponse(payload) {
 function globalSearchFilter(rowData) {
   const query = searchElement.value.trim().toLocaleLowerCase();
   if (!query) return true;
+
+  if (typeof rowData._searchText === "string") {
+    return rowData._searchText.includes(query);
+  }
 
   return searchableFields.some(function (field) {
     return String(rowData[field] || "").toLocaleLowerCase().includes(query);
