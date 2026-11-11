@@ -13,6 +13,7 @@ const clearButton = document.getElementById("clear-filters");
 const retryButton = document.getElementById("retry-database");
 const fullscreenButton = document.getElementById("fullscreen-toggle");
 const COLUMN_PREFERENCES_KEY = "keldric-gaming-hidden-columns-v1";
+const ANALYTICS_SEARCH_DEBOUNCE_MS = 1000;
 
 let table = null;
 let searchableFields = [];
@@ -24,8 +25,13 @@ let gemstationModeActive = false;
 let columnPickerToggleButton = null;
 let columnPickerMenu = null;
 let syncColumnPickerCheckboxes = function () {};
+let filteredWidthSnapshot = null;
+let filteredWidthQueue = Promise.resolve();
+let filteredWidthFrame = 0;
+let filteredWidthVersion = 0;
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
+const analyticsTimers = new Map();
 let activeValueMenu = null;
 let valueMenuElement = null;
 
@@ -52,6 +58,115 @@ function saveHiddenColumns() {
 function setStatus(message, isError) {
   statusElement.textContent = message;
   statusElement.classList.toggle("error", Boolean(isError));
+}
+
+function sendUsageEvent(eventName, parameters) {
+  if (typeof window.gtag !== "function") return;
+  window.gtag("event", eventName, Object.assign({ transport_type: "beacon" }, parameters || {}));
+}
+
+function safeAnalyticsText(value, maxLength) {
+  const text = String(value == null ? "" : value).trim().replace(/\s+/g, " ");
+  if (text.length < 2 || /@|https?:\/\/|www\./i.test(text)) return "";
+  const digitCount = (text.match(/\d/g) || []).length;
+  if (digitCount >= 7) return "";
+  return text.slice(0, maxLength || 80);
+}
+
+function activeResultCount() {
+  if (!table || typeof table.getDataCount !== "function") return 0;
+  return table.getDataCount("active");
+}
+
+function analyticsDestinationUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(String(url));
+  } catch (_error) {
+    return "";
+  }
+
+  const hostname = parsed.hostname.toLocaleLowerCase();
+  if (hostname === "youtu.be" || hostname === "youtube.com" || hostname.endsWith(".youtube.com")) {
+    let videoId = parsed.searchParams.get("v") || "";
+    if (!videoId && hostname === "youtu.be") videoId = parsed.pathname.split("/").filter(Boolean)[0] || "";
+    if (!videoId) {
+      const videoPath = parsed.pathname.match(/^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]+)/i);
+      if (videoPath) videoId = videoPath[1];
+    }
+    if (videoId) return "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
+  }
+
+  const safeParameters = new URLSearchParams();
+  parsed.searchParams.forEach(function (value, key) {
+    if (/^(utm_.+|fbclid|gclid|dclid|msclkid|ref|ref_src|si|snr)$/i.test(key)) return;
+    if (/email|phone|token|auth|session/i.test(key) || /@|https?:\/\//i.test(value)) return;
+    safeParameters.append(key, value);
+  });
+
+  const query = safeParameters.toString();
+  return parsed.origin + parsed.pathname + (query ? "?" + query : "");
+}
+
+function scheduleSearchUsage(scope, field, title, readQuery) {
+  const timerKey = "search:" + scope + ":" + field;
+  const oldTimer = analyticsTimers.get(timerKey);
+  if (oldTimer) window.clearTimeout(oldTimer);
+
+  const rawQuery = String(readQuery() || "").trim();
+  if (!rawQuery || rawQuery.toLocaleLowerCase() === GEMSTATION_TRIGGER) return;
+
+  const timer = window.setTimeout(function () {
+    analyticsTimers.delete(timerKey);
+    const currentQuery = String(readQuery() || "").trim();
+    const queryTerm = safeAnalyticsText(currentQuery, 80);
+    if (!queryTerm || currentQuery.toLocaleLowerCase() === GEMSTATION_TRIGGER) return;
+
+    const parameters = {
+      search_scope: scope,
+      search_term: queryTerm,
+      result_count: activeResultCount(),
+    };
+    if (field) parameters.column_name = safeAnalyticsText(title, 60) || "Column";
+    sendUsageEvent("database_search", parameters);
+  }, ANALYTICS_SEARCH_DEBOUNCE_MS);
+
+  analyticsTimers.set(timerKey, timer);
+}
+
+function scheduleColumnFilterUsage(field, title, state) {
+  const timerKey = "filter:" + field;
+  const oldTimer = analyticsTimers.get(timerKey);
+  if (oldTimer) window.clearTimeout(oldTimer);
+
+  const snapshot = {
+    query: String(state.query || "").trim(),
+    selectedValues: Array.isArray(state.selectedValues) ? state.selectedValues.slice() : [],
+    notesOnly: Boolean(state.notesOnly),
+  };
+
+  const timer = window.setTimeout(function () {
+    analyticsTimers.delete(timerKey);
+    const values = snapshot.selectedValues
+      .slice(0, 5)
+      .map(function (value) { return safeAnalyticsText(value, 24); })
+      .filter(Boolean);
+    const filterTypes = [];
+    if (snapshot.query) filterTypes.push("text");
+    if (snapshot.selectedValues.length) filterTypes.push("selected_values");
+    if (snapshot.notesOnly) filterTypes.push("notes_only");
+
+    sendUsageEvent("database_filter", {
+      column_name: safeAnalyticsText(title, 60) || "Column",
+      filter_type: filterTypes.join(",") || "cleared",
+      selected_value_count: snapshot.selectedValues.length,
+      selected_values: values.join(" | ").slice(0, 100),
+      notes_only: snapshot.notesOnly,
+      result_count: activeResultCount(),
+    });
+  }, ANALYTICS_SEARCH_DEBOUNCE_MS);
+
+  analyticsTimers.set(timerKey, timer);
 }
 
 function loadDatabase() {
@@ -148,6 +263,14 @@ function linkFormatter(cell) {
   anchor.rel = "noopener noreferrer";
   anchor.textContent = label || safeUrl.hostname;
   anchor.setAttribute("aria-label", anchor.textContent + " (opens in a new tab)");
+  anchor.addEventListener("click", function () {
+    sendUsageEvent("database_link_click", {
+      game_name: safeAnalyticsText(row.c0, 80),
+      column_name: safeAnalyticsText(cell.getColumn().getDefinition().title, 60) || "Link",
+      link_domain: safeAnalyticsText(safeUrl.hostname, 100),
+      destination_url: analyticsDestinationUrl(safeUrl.href),
+    });
+  });
   return anchor;
 }
 
@@ -192,6 +315,7 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
       notesOnly: state.notesOnly,
     });
     updateChoicesButton(choicesButton, state, field);
+    scheduleSearchUsage("column", field, title, function () { return input.value; });
   }
 
   input.addEventListener("input", commitFilter);
@@ -451,6 +575,7 @@ function commitActiveValueMenu() {
     notesOnly: state.notesOnly,
   });
   updateChoicesButton(activeValueMenu.button, state, activeValueMenu.title);
+  scheduleColumnFilterUsage(activeValueMenu.field, activeValueMenu.title, state);
 }
 
 function positionColumnValueMenu() {
@@ -638,6 +763,79 @@ function applyGlobalSearch() {
   }
 }
 
+function hasActiveUserFilters() {
+  if (gemstationModeActive || searchElement.value.trim()) return true;
+  return Array.from(columnFilterStates.values()).some(function (state) {
+    return Boolean(
+      String(state.query || "").trim() ||
+      (Array.isArray(state.selectedValues) && state.selectedValues.length) ||
+      state.notesOnly
+    );
+  });
+}
+
+function resizeColumnsForFilteredResults() {
+  if (!table) return;
+  const shouldFit = hasActiveUserFilters();
+  const version = ++filteredWidthVersion;
+  const columns = table.getColumns();
+
+  if (shouldFit && !filteredWidthSnapshot) {
+    filteredWidthSnapshot = new Map();
+    columns.forEach(function (column) {
+      const definition = column.getDefinition();
+      filteredWidthSnapshot.set(column.getField(), {
+        width: column.getWidth(),
+        minWidth: definition.minWidth,
+      });
+    });
+    filteredWidthQueue = filteredWidthQueue.catch(function () {}).then(function () {
+      return Promise.all(columns.map(function (column) {
+        return column.updateDefinition({ minWidth: 56 });
+      }));
+    });
+  }
+
+  if (!shouldFit && filteredWidthSnapshot) {
+    const snapshot = filteredWidthSnapshot;
+    filteredWidthSnapshot = null;
+    if (filteredWidthFrame) window.cancelAnimationFrame(filteredWidthFrame);
+    filteredWidthFrame = 0;
+    filteredWidthQueue = filteredWidthQueue.catch(function () {}).then(function () {
+      return Promise.all(table.getColumns().map(function (column) {
+        const original = snapshot.get(column.getField());
+        if (!original) return Promise.resolve();
+        return column.updateDefinition({ minWidth: original.minWidth });
+      }));
+    }).then(function () {
+      if (version !== filteredWidthVersion || filteredWidthSnapshot) return;
+      table.getColumns().forEach(function (column) {
+        const original = snapshot.get(column.getField());
+        if (original && Number(original.width) > 0) column.setWidth(original.width);
+      });
+      table.redraw(true);
+    });
+    return;
+  }
+
+  if (shouldFit) {
+    filteredWidthQueue.then(function () {
+      if (version !== filteredWidthVersion || !filteredWidthSnapshot) return;
+      if (filteredWidthFrame) window.cancelAnimationFrame(filteredWidthFrame);
+      filteredWidthFrame = window.requestAnimationFrame(function () {
+        filteredWidthFrame = 0;
+        if (version !== filteredWidthVersion || !filteredWidthSnapshot) return;
+        table.getColumns().forEach(function (column) {
+          if (column.isVisible()) column.setWidth(true);
+        });
+        table.redraw(true);
+      });
+    }).catch(function (error) {
+      console.warn("Could not resize filtered database columns:", error);
+    });
+  }
+}
+
 function enterGemstationMode() {
   if (!table || gemstationModeActive) return;
   if (!table.getColumn(GEMSTATION_DATE_FIELD)) {
@@ -809,7 +1007,10 @@ function addColumnPicker(columns) {
       }
 
       saveHiddenColumns();
-      window.requestAnimationFrame(function () { table.redraw(true); });
+      window.requestAnimationFrame(function () {
+        table.redraw(true);
+        if (hasActiveUserFilters()) resizeColumnsForFilteredResults();
+      });
     });
 
     label.append(checkbox, text);
@@ -838,7 +1039,10 @@ function addColumnPicker(columns) {
     });
     saveHiddenColumns();
     syncCheckboxes();
-    window.requestAnimationFrame(function () { table.redraw(true); });
+    window.requestAnimationFrame(function () {
+      table.redraw(true);
+      if (hasActiveUserFilters()) resizeColumnsForFilteredResults();
+    });
   });
 
   doneButton.addEventListener("click", function () {
@@ -892,16 +1096,23 @@ async function startDatabase() {
       placeholder: "No games match these filters.",
     });
 
+    table.on("dataFiltered", resizeColumnsForFilteredResults);
+
     addColumnPicker(normalized.columns);
 
     if (!databaseControlsBound) {
-      searchElement.addEventListener("input", applyGlobalSearch);
+      searchElement.addEventListener("input", function () {
+        applyGlobalSearch();
+        scheduleSearchUsage("all_columns", "", "", function () { return searchElement.value; });
+      });
       clearButton.addEventListener("click", function () {
+        const filtersWereActive = hasActiveUserFilters();
         searchElement.value = "";
       if (gemstationModeActive) {
         leaveGemstationMode();
         return;
       }
+        if (filtersWereActive) sendUsageEvent("database_filters_cleared", { result_count: databaseRows.length });
         clearColumnFilters();
         table.clearFilter(true);
       });
