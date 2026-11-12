@@ -46,7 +46,11 @@ let columnPickerToggleButton = null;
 let columnPickerMenu = null;
 let comparisonFilterSelect = null;
 let comparisonFilterField = "";
+let filteredCardsButton = document.getElementById("view-filtered-cards");
 let surpriseDialogParts = null;
+let cardBrowseMode = "surprise";
+let filteredCardRows = [];
+let filteredCardIndex = -1;
 let surpriseEligibleRows = [];
 let surpriseHistory = [];
 let surpriseHistoryIndex = -1;
@@ -356,6 +360,7 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
       notesOnly: state.notesOnly,
     });
     updateChoicesButton(choicesButton, state, field);
+    updateFilteredCardsButton();
     scheduleSearchUsage("column", field, title, function () { return input.value; });
   }
 
@@ -616,6 +621,7 @@ function commitActiveValueMenu() {
     notesOnly: state.notesOnly,
   });
   updateChoicesButton(activeValueMenu.button, state, activeValueMenu.title);
+  updateFilteredCardsButton();
   scheduleColumnFilterUsage(activeValueMenu.field, activeValueMenu.title, state);
 }
 
@@ -663,6 +669,7 @@ function clearColumnFilters() {
   });
   closeColumnValueMenu(false);
   if (comparisonFilterSelect) comparisonFilterSelect.value = "";
+  updateFilteredCardsButton();
 }
 
 function normalizeResponse(payload) {
@@ -1212,6 +1219,7 @@ function appendSurpriseLinks(parent, row) {
 
 function renderSurpriseGame(row) {
   const parts = createSurpriseDialog();
+  parts.dialog.setAttribute("aria-label", cardBrowseMode === "filtered" ? "Filtered game cards" : "Surprise game");
   parts.title.textContent = cleanGameValue(row.c0) || "Untitled game";
   parts.primary.replaceChildren();
   parts.tags.replaceChildren();
@@ -1251,8 +1259,21 @@ function renderSurpriseGame(row) {
   if (!parts.details.childElementCount) parts.details.hidden = true;
   else parts.details.hidden = false;
 
-  parts.previousButton.hidden = surpriseHistoryIndex <= 0;
-  parts.nextButton.hidden = false;
+  if (cardBrowseMode === "filtered") {
+    parts.previousButton.hidden = filteredCardIndex <= 0;
+    parts.nextButton.hidden = filteredCardIndex >= filteredCardRows.length - 1;
+    parts.previousButton.title = "Previous matching game";
+    parts.nextButton.title = "Next matching game";
+    parts.previousButton.setAttribute("aria-label", "Previous matching game");
+    parts.nextButton.setAttribute("aria-label", "Next matching game");
+  } else {
+    parts.previousButton.hidden = surpriseHistoryIndex <= 0;
+    parts.nextButton.hidden = false;
+    parts.previousButton.title = "Previous game";
+    parts.nextButton.title = "Another random game";
+    parts.previousButton.setAttribute("aria-label", "Previous surprise game");
+    parts.nextButton.setAttribute("aria-label", "Another random game");
+  }
   if (!parts.dialog.open) parts.dialog.showModal();
   else parts.body.scrollTop = 0;
 }
@@ -1261,6 +1282,7 @@ function openSurpriseMe() {
   let stage = "checking the loaded database";
   try {
     if (!table) return;
+    cardBrowseMode = "surprise";
     try { loadSurpriseDefinitions(); } catch (_error) {}
     const activeRows = table.getData("active");
     surpriseEligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
@@ -1279,7 +1301,29 @@ function openSurpriseMe() {
   }
 }
 
+function openFilteredCards() {
+  if (!table || !hasActiveUserFilters()) return;
+  const activeRows = table.getData("active");
+  if (!activeRows.length) {
+    setStatus("No games match the current search and filters.", true);
+    return;
+  }
+  try { loadSurpriseDefinitions(); } catch (_error) {}
+  cardBrowseMode = "filtered";
+  filteredCardRows = activeRows;
+  filteredCardIndex = 0;
+  renderSurpriseGame(filteredCardRows[filteredCardIndex]);
+}
+
 function moveSurpriseHistory(direction) {
+  if (cardBrowseMode === "filtered") {
+    const nextIndex = filteredCardIndex + direction;
+    if (nextIndex < 0 || nextIndex >= filteredCardRows.length) return;
+    filteredCardIndex = nextIndex;
+    renderSurpriseGame(filteredCardRows[filteredCardIndex]);
+    return;
+  }
+
   if (direction < 0) {
     if (surpriseHistoryIndex <= 0) return;
     surpriseHistoryIndex -= 1;
@@ -1317,9 +1361,13 @@ function globalSearchFilter(rowData) {
 }
 
 function applyGlobalSearch() {
-  if (!table) return;
+  if (!table) {
+    updateFilteredCardsButton();
+    return;
+  }
   if (searchElement.value.trim().toLocaleLowerCase() === GEMSTATION_TRIGGER) {
     enterGemstationMode();
+    updateFilteredCardsButton();
     return;
   }
   if (gemstationModeActive) leaveGemstationMode();
@@ -1329,6 +1377,7 @@ function applyGlobalSearch() {
   } else {
     table.setFilter(globalSearchFilter);
   }
+  updateFilteredCardsButton();
 }
 
 function hasActiveUserFilters() {
@@ -1340,6 +1389,11 @@ function hasActiveUserFilters() {
       state.notesOnly
     );
   });
+}
+
+function updateFilteredCardsButton() {
+  if (!filteredCardsButton) filteredCardsButton = document.getElementById("view-filtered-cards");
+  if (filteredCardsButton) filteredCardsButton.hidden = !hasActiveUserFilters();
 }
 
 function enterGemstationMode() {
@@ -1368,6 +1422,7 @@ function enterGemstationMode() {
   });
   table.setSort(GEMSTATION_DATE_FIELD, "desc");
   setStatus("Gemstation view: submitted games, newest first.", false);
+  updateFilteredCardsButton();
 }
 
 function leaveGemstationMode() {
@@ -1388,6 +1443,7 @@ function leaveGemstationMode() {
   const query = searchElement.value.trim();
   if (query) table.setFilter(globalSearchFilter);
   else table.clearFilter();
+  updateFilteredCardsButton();
   const count = Number(countElement.textContent.replace(/[^0-9]/g, ""));
   setStatus("Loaded " + (Number.isFinite(count) ? count.toLocaleString() : databaseRows.length.toLocaleString()) + " games from the Master worksheet.", false);
 }
@@ -1452,6 +1508,12 @@ function addColumnPicker(columns) {
   surpriseButton.setAttribute("aria-label", "Show a random game matching the current filters");
   surpriseButton.addEventListener("click", openSurpriseMe);
 
+  if (!filteredCardsButton) filteredCardsButton = document.getElementById("view-filtered-cards");
+  if (filteredCardsButton && filteredCardsButton.dataset.clickBound !== "true") {
+    filteredCardsButton.addEventListener("click", openFilteredCards);
+    filteredCardsButton.dataset.clickBound = "true";
+  }
+
   const comparisonSelect = document.createElement("select");
   comparisonSelect.id = "comparison-game-filter";
   comparisonSelect.className = "comparison-filter-select";
@@ -1487,6 +1549,7 @@ function addColumnPicker(columns) {
       notesOnly: false,
     });
     updateChoicesButton(control.button, state, comparisonFilterField);
+    updateFilteredCardsButton();
     scheduleSearchUsage("column", comparisonFilterField, "Comparison", function () {
       return state.query;
     });
@@ -1657,6 +1720,7 @@ async function startDatabase() {
     if (!databaseControlsBound) {
       searchElement.addEventListener("input", function () {
         applyGlobalSearch();
+        updateFilteredCardsButton();
         scheduleSearchUsage("all_columns", "", "", function () { return searchElement.value; });
       });
       clearButton.addEventListener("click", function () {
@@ -1669,6 +1733,7 @@ async function startDatabase() {
         if (filtersWereActive) sendUsageEvent("database_filters_cleared", { result_count: databaseRows.length });
         clearColumnFilters();
         table.clearFilter(true);
+        updateFilteredCardsButton();
       });
     applyGlobalSearch();
       databaseControlsBound = true;

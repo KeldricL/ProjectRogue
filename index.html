@@ -16,7 +16,7 @@
     });
   </script>
   <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.5.0/dist/css/tabulator.min.css">
-  <link rel="stylesheet" href="styles.css?v=20261112-surprise-me-10">
+  <link rel="stylesheet" href="styles.css?v=20261112-filtered-cards-1">
 </head>
 <body>
   <main class="page-shell">
@@ -36,6 +36,7 @@
     </header>
 
     <div class="database-status-row">
+      <button id="view-filtered-cards" class="view-filtered-cards" type="button" hidden>View these game cards</button>
       <div id="status" class="status" role="status" aria-live="polite">Loading game database…</div>
       <button id="retry-database" class="retry-button" type="button" hidden>Reload database</button>
     </div>
@@ -48,7 +49,7 @@
     </footer>
   </main>
 
-  <script type="module" src="tabulator-slim-loader.js?v=20261112-tabulator-slim-1"></script>
+  <script type="module" src="tabulator-slim-loader.js?v=20261112-filtered-cards-1"></script>
 </body>
 </html>
 
