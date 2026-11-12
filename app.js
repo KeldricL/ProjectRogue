@@ -837,7 +837,7 @@ function createSurpriseDialog() {
   previousButton.className = "surprise-nav-button surprise-previous";
   previousButton.setAttribute("aria-label", "Previous surprise game");
   previousButton.title = "Previous game";
-  previousButton.textContent = "‹";
+  previousButton.textContent = "←";
   previousButton.hidden = true;
   previousButton.addEventListener("click", function () { moveSurpriseHistory(-1); });
 
@@ -846,7 +846,7 @@ function createSurpriseDialog() {
   nextButton.className = "surprise-nav-button surprise-next";
   nextButton.setAttribute("aria-label", "Another random game");
   nextButton.title = "Another random game";
-  nextButton.textContent = "›";
+  nextButton.textContent = "→";
   nextButton.addEventListener("click", function () { moveSurpriseHistory(1); });
 
   const card = document.createElement("article");
@@ -1183,6 +1183,7 @@ function renderSurpriseGame(row) {
   else parts.details.hidden = false;
 
   parts.previousButton.hidden = surpriseHistoryIndex <= 0;
+  parts.nextButton.hidden = false;
   if (!parts.dialog.open) parts.dialog.showModal();
   else parts.body.scrollTop = 0;
 }

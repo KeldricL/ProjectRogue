@@ -244,11 +244,13 @@ button:hover { border-color: #6dc583; background: #30393a; }
   color: #e8edf5;
 }
 .surprise-dialog::backdrop { background: #080b0de0; backdrop-filter: blur(3px); }
-.surprise-dialog-layout { display: grid; grid-template-columns: 38px minmax(0, 1fr) 38px; gap: 10px; align-items: center; width: 100%; }
-.surprise-nav-button { display: flex; width: 38px; min-height: 38px; align-items: center; justify-content: center; padding: 0; border-color: #596560; border-radius: 8px; color: #b8efc3; font-size: 1.8rem; line-height: 1; }
+.surprise-dialog-layout { display: grid; grid-template-columns: 38px minmax(0, 1fr) 38px; grid-template-areas: "previous card next"; gap: 10px; align-items: center; width: 100%; }
+.surprise-nav-button { position: relative; z-index: 1; display: flex; width: 38px; min-height: 38px; align-items: center; justify-content: center; padding: 0; border-color: #596560; border-radius: 8px; color: #b8efc3; font-size: 1.8rem; line-height: 1; }
 .surprise-nav-button[hidden] { display: none !important; }
+.surprise-previous { grid-area: previous; }
+.surprise-next { grid-area: next; }
 .surprise-card {
-  grid-column: 2;
+  grid-area: card;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -297,11 +299,11 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-feature-heading { margin: 0 0 7px; color: #b8efc3; font-size: .84rem; font-weight: 750; }
 .surprise-feature-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 7px; }
 .surprise-links { margin-top: 20px; padding-top: 14px; border-top: 1px solid #41494d; }
-.surprise-link-cards { display: flex; flex-wrap: wrap; gap: 10px; }
-.surprise-link-card { display: flex; flex: 0 1 180px; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
-.surprise-game-link { display: inline-flex; align-items: center; min-height: 36px; padding: 7px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
+.surprise-link-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 10px; }
+.surprise-link-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; width: 180px; min-width: 0; }
+.surprise-game-link { display: inline-flex; justify-self: start; align-items: center; max-width: 100%; min-height: 36px; margin: 0; padding: 7px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
 .surprise-game-link:hover { border-color: #83cf9a; background: #304237; }
-.surprise-thumbnail-link { display: flex; width: 100%; height: 102px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
+.surprise-thumbnail-link { display: flex; width: 100%; height: 102px; margin: 0; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
 .surprise-thumbnail-link img { display: block; width: 100%; height: 100%; padding: 2px; object-fit: contain; }
 .surprise-thumbnail-link.thumbnail-unavailable { font-size: .82rem; font-weight: 700; }
 .surprise-no-links { margin: 0; color: #aeb8bf; }
@@ -337,6 +339,12 @@ html:fullscreen .status,
 html:fullscreen .page-footer { flex: 0 0 auto; }
 html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
 
+@media (min-width: 761px) {
+  .header-actions { width: min(460px, 45vw); min-width: 0; flex: 0 1 460px; grid-template-columns: minmax(0, 1fr) auto; }
+  .header-actions #clear-filters { justify-self: start; min-width: 0; padding-right: 8px; padding-left: 8px; white-space: nowrap; }
+  .header-button-row { width: 100%; min-width: 0; padding-left: 12px; }
+}
+
 @media (max-width: 760px) {
   .page-shell { padding-top: 18px; }
   .page-header { align-items: stretch; flex-direction: column; gap: 16px; }
@@ -366,6 +374,8 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .surprise-primary-fields { grid-template-columns: 1fr; }
   .surprise-detail-grid { grid-template-columns: 1fr; }
   .surprise-thumbnail-link { height: auto; aspect-ratio: 16 / 9; }
+  .surprise-link-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .surprise-link-card { width: auto; }
   .column-picker-menu { position: fixed; top: 50%; right: auto; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 24px)); max-height: min(70vh, 520px); }
   .column-value-menu { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 20px)); max-height: min(72vh, 560px); }
   .table-frame { height: 65vh; min-height: 360px; border-radius: 6px; }
