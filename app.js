@@ -6,6 +6,23 @@ const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
 const GEMSTATION_TRIGGER = "##gemstation";
 const GEMSTATION_DATE_FIELD = "c46"; // AU, zero-based column index
 const GEMSTATION_VISIBLE_FIELDS = new Set(["c0", "c2", "c3", "c4", "c6", "c42", "c43", GEMSTATION_DATE_FIELD]);
+const COMPARISON_FILTER_OPTIONS = [
+  { abbreviation: "Atomicrops-like", phrase: "Atomicrops" },
+  { abbreviation: "Brotato-Like", phrase: "Brotato" },
+  { abbreviation: "COTL-Like", phrase: "Cult of the Lamb" },
+  { abbreviation: "Dead Cells-Like", phrase: "Dead Cells" },
+  { abbreviation: "DMD-Like", phrase: "Death Must Die" },
+  { abbreviation: "ETG-Like", phrase: "Enter the Gungeon" },
+  { abbreviation: "Hades-Like", phrase: "Hades" },
+  { abbreviation: "Megabonk-Like", phrase: "Megabonk" },
+  { abbreviation: "ROR2-Like", phrase: "Risk of Rain 2" },
+  { abbreviation: "Soulstone-like", phrase: "Soulstone Survivors" },
+  { abbreviation: "Spelunky-Like", phrase: "Spelunky" },
+  { abbreviation: "STS-Like", phrase: "Slay the Spire" },
+  { abbreviation: "TBOI-Like", phrase: "Binding of Isaac" },
+  { abbreviation: "VS-Like", phrase: "Vampire Survivors" },
+  { abbreviation: "Ziggurat-Like", phrase: "Ziggurat" },
+];
 const statusElement = document.getElementById("status");
 const countElement = document.getElementById("record-count");
 const searchElement = document.getElementById("global-search");
@@ -24,6 +41,8 @@ let hiddenColumnFields = loadHiddenColumns();
 let gemstationModeActive = false;
 let columnPickerToggleButton = null;
 let columnPickerMenu = null;
+let comparisonFilterSelect = null;
+let comparisonFilterField = "";
 let syncColumnPickerCheckboxes = function () {};
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
@@ -305,6 +324,12 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
 
   function commitFilter() {
     state.query = input.value;
+    if (field === comparisonFilterField && comparisonFilterSelect) {
+      const matchingOption = COMPARISON_FILTER_OPTIONS.find(function (option) {
+        return option.abbreviation.toLocaleLowerCase() === state.query.trim().toLocaleLowerCase();
+      });
+      comparisonFilterSelect.value = matchingOption ? matchingOption.abbreviation : "";
+    }
     success({
       query: state.query,
       selectedValues: state.selectedValues.slice(),
@@ -617,6 +642,7 @@ function clearColumnFilters() {
     updateChoicesButton(control.button, getColumnFilterState(field), field);
   });
   closeColumnValueMenu(false);
+  if (comparisonFilterSelect) comparisonFilterSelect.value = "";
 }
 
 function normalizeResponse(payload) {
@@ -626,6 +652,12 @@ function normalizeResponse(payload) {
 
   searchableFields = payload.headers.map(function (_header, index) {
     return "c" + index;
+  });
+  comparisonFilterField = "";
+  payload.headers.some(function (header, index) {
+    if (String(header == null ? "" : header).trim().toLocaleLowerCase() !== "comparison") return false;
+    comparisonFilterField = "c" + index;
+    return true;
   });
 
   const isPhone = window.matchMedia("(max-width: 600px)").matches;
@@ -797,6 +829,7 @@ function enterGemstationMode() {
     columnPickerToggleButton.disabled = true;
     columnPickerToggleButton.setAttribute("aria-expanded", "false");
   }
+  if (comparisonFilterSelect) comparisonFilterSelect.disabled = true;
   table.setFilter(function (rowData) {
     return Boolean(String(rowData[GEMSTATION_DATE_FIELD] || "").trim());
   });
@@ -816,6 +849,7 @@ function leaveGemstationMode() {
     else column.hide();
   });
   if (columnPickerToggleButton) columnPickerToggleButton.disabled = false;
+  if (comparisonFilterSelect) comparisonFilterSelect.disabled = !comparisonFilterField;
   syncColumnPickerCheckboxes();
 
   const query = searchElement.value.trim();
@@ -874,6 +908,45 @@ function addColumnPicker(columns) {
   toggleButton.setAttribute("aria-controls", "column-picker-menu");
   columnPickerToggleButton = toggleButton;
   actionRow.insertBefore(toggleButton, fullscreenButton || null);
+
+  const comparisonSelect = document.createElement("select");
+  comparisonSelect.id = "comparison-game-filter";
+  comparisonSelect.className = "comparison-filter-select";
+  comparisonSelect.setAttribute("aria-label", "Filter Comparison by game");
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Compare by game…";
+  comparisonSelect.appendChild(defaultOption);
+  COMPARISON_FILTER_OPTIONS.forEach(function (option) {
+    const item = document.createElement("option");
+    item.value = option.abbreviation;
+    item.textContent = option.phrase;
+    comparisonSelect.appendChild(item);
+  });
+  comparisonFilterSelect = comparisonSelect;
+  comparisonSelect.disabled = !comparisonFilterField;
+  if (!comparisonFilterField) comparisonSelect.title = "The database feed does not include a Comparison column.";
+  actionRow.insertBefore(comparisonSelect, fullscreenButton || null);
+
+  comparisonSelect.addEventListener("change", function () {
+    if (!comparisonFilterField) return;
+    const control = columnFilterControls.get(comparisonFilterField);
+    if (!control) return;
+    const state = getColumnFilterState(comparisonFilterField);
+    state.query = comparisonSelect.value;
+    state.selectedValues = [];
+    state.notesOnly = false;
+    control.input.value = state.query;
+    control.success({
+      query: state.query,
+      selectedValues: [],
+      notesOnly: false,
+    });
+    updateChoicesButton(control.button, state, comparisonFilterField);
+    scheduleSearchUsage("column", comparisonFilterField, "Comparison", function () {
+      return state.query;
+    });
+  });
 
   const menu = document.createElement("div");
   menu.id = "column-picker-menu";

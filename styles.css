@@ -55,6 +55,10 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .page-footer { display: flex; justify-content: space-between; gap: 12px; padding: 10px 2px 0; color: #aeb8bf; font-size: .82rem; }
 .header-button-row { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; }
 .header-button-row button { width: auto; }
+.comparison-filter-select { min-height: 42px; max-width: 250px; padding: 8px 30px 8px 11px; border: 1px solid #4b555a; border-radius: 7px; background: #252b2e; color: #eef2f4; font: inherit; font-weight: 650; cursor: pointer; }
+.comparison-filter-select:hover { border-color: #6dc583; background: #30393a; }
+.comparison-filter-select:focus { border-color: #6dc583; outline: 3px solid #6dc58333; }
+.comparison-filter-select:disabled { cursor: not-allowed; opacity: .6; }
 .column-picker-menu[hidden] { display: none !important; }
 .column-picker-menu {
   position: absolute;
@@ -273,6 +277,7 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .search-label { grid-column: 1; }
   .header-button-row { flex-direction: column; align-items: stretch; }
   .header-button-row button { width: 100%; }
+  .comparison-filter-select { width: 100%; max-width: none; }
   .column-picker-menu { position: fixed; top: 50%; right: auto; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 24px)); max-height: min(70vh, 520px); }
   .column-value-menu { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 20px)); max-height: min(72vh, 560px); }
   .table-frame { height: 65vh; min-height: 360px; border-radius: 6px; }
