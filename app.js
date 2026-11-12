@@ -785,6 +785,17 @@ function cleanGameValue(value) {
   return String(value == null ? "" : value).trim();
 }
 
+function hasAtLeastThreeDataPoints(row) {
+  let count = 0;
+  for (let index = 5; index <= 38; index += 1) {
+    const value = cleanGameValue(row["c" + index]);
+    if (!value || NON_DATA_VALUES.has(value.toLocaleLowerCase())) continue;
+    count += 1;
+    if (count >= 3) return true;
+  }
+  return false;
+}
+
 function normalizeDefinitionTerm(value) {
   return String(value || "")
     .normalize("NFKD")
@@ -1197,18 +1208,23 @@ function renderSurpriseGame(row) {
 }
 
 function openSurpriseMe() {
-  if (!table) return;
-  try { loadSurpriseDefinitions(); } catch (_error) {}
-  const activeRows = table.getData("active");
-  surpriseEligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
-  if (!surpriseEligibleRows.length) {
-    setStatus("No games with at least 3 data points match the current search and filters.", true);
-    return;
+  try {
+    if (!table) return;
+    try { loadSurpriseDefinitions(); } catch (_error) {}
+    const activeRows = table.getData("active");
+    surpriseEligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
+    if (!surpriseEligibleRows.length) {
+      setStatus("No games with at least 3 data points match the current search and filters.", true);
+      return;
+    }
+    const selected = surpriseEligibleRows[Math.floor(Math.random() * surpriseEligibleRows.length)];
+    surpriseHistory = [selected];
+    surpriseHistoryIndex = 0;
+    renderSurpriseGame(selected);
+  } catch (error) {
+    console.error("Surprise Me could not open:", error);
+    setStatus("Surprise Me could not open. Please reload the database and try again.", true);
   }
-  const selected = surpriseEligibleRows[Math.floor(Math.random() * surpriseEligibleRows.length)];
-  surpriseHistory = [selected];
-  surpriseHistoryIndex = 0;
-  renderSurpriseGame(selected);
 }
 
 function moveSurpriseHistory(direction) {
