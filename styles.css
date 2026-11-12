@@ -291,6 +291,7 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-section-heading { margin-bottom: 9px; color: #b8efc3; font-size: .98rem; }
 .surprise-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 7px 9px; }
 .surprise-detail-item { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 7px; min-width: 0; padding: 9px 11px; border: 1px solid #303b3e; border-radius: 7px; background: #202729; }
+.surprise-dialog .surprise-detail-grid > .surprise-detail-item { align-self: start !important; height: fit-content !important; min-height: 0 !important; }
 .surprise-detail-item .surprise-detail-label { display: inline; flex: 0 1 auto; margin: 0; }
 .surprise-detail-separator { color: #83cf9a; font-weight: 800; }
 .surprise-detail-value { display: inline; min-width: 0; color: #e8edf5; overflow-wrap: anywhere; }
