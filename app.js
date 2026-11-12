@@ -31,6 +31,8 @@ const retryButton = document.getElementById("retry-database");
 const fullscreenButton = document.getElementById("fullscreen-toggle");
 const COLUMN_PREFERENCES_KEY = "keldric-gaming-hidden-columns-v1";
 const ANALYTICS_SEARCH_DEBOUNCE_MS = 1000;
+const ANALYTICS_SCRIPT_URL = "https://www.googletagmanager.com/gtag/js?id=G-QFF7PSFS4L";
+let analyticsScriptRequested = false;
 
 let table = null;
 let searchableFields = [];
@@ -85,6 +87,17 @@ function setStatus(message, isError) {
 function sendUsageEvent(eventName, parameters) {
   if (typeof window.gtag !== "function") return;
   window.gtag("event", eventName, Object.assign({ transport_type: "beacon" }, parameters || {}));
+  if (analyticsScriptRequested) return;
+
+  analyticsScriptRequested = true;
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = ANALYTICS_SCRIPT_URL;
+  script.onerror = function () {
+    analyticsScriptRequested = false;
+    script.remove();
+  };
+  document.head.appendChild(script);
 }
 
 function safeAnalyticsText(value, maxLength) {
