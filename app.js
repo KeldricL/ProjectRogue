@@ -34,6 +34,7 @@ const ANALYTICS_SEARCH_DEBOUNCE_MS = 1000;
 
 let table = null;
 let searchableFields = [];
+let databaseHeaders = [];
 let isLoading = false;
 let databaseControlsBound = false;
 let databaseRows = [];
@@ -43,6 +44,7 @@ let columnPickerToggleButton = null;
 let columnPickerMenu = null;
 let comparisonFilterSelect = null;
 let comparisonFilterField = "";
+let surpriseDialogParts = null;
 let syncColumnPickerCheckboxes = function () {};
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
@@ -653,6 +655,10 @@ function normalizeResponse(payload) {
   searchableFields = payload.headers.map(function (_header, index) {
     return "c" + index;
   });
+  databaseHeaders = payload.headers.map(function (header, index) {
+    const label = header == null ? "" : String(header).trim();
+    return label || "Column " + (index + 1);
+  });
   comparisonFilterField = "";
   payload.headers.some(function (header, index) {
     if (String(header == null ? "" : header).trim().toLocaleLowerCase() !== "comparison") return false;
@@ -768,6 +774,345 @@ function normalizeResponse(payload) {
 
   databaseRows = data;
   return { columns: columns, data: data };
+}
+
+const NON_DATA_VALUES = new Set(["n", "none", "na", "n/a"]);
+
+function cleanGameValue(value) {
+  return String(value == null ? "" : value).trim();
+}
+
+function isMeaningfulGameValue(value) {
+  const text = cleanGameValue(value);
+  return Boolean(text) && !NON_DATA_VALUES.has(text.toLocaleLowerCase());
+}
+
+function hasAtLeastThreeDataPoints(row) {
+  let count = 0;
+  for (let index = 5; index <= 38; index += 1) {
+    if (isMeaningfulGameValue(row["c" + index])) count += 1;
+    if (count >= 3) return true;
+  }
+  return false;
+}
+
+function findSurpriseCardFields() {
+  const comparisonIndex = databaseHeaders.findIndex(function (header) {
+    return header.toLocaleLowerCase().includes("comparison");
+  });
+  let themeIndices = databaseHeaders.map(function (header, index) {
+    return /\bthemes?\b/i.test(header) ? index : -1;
+  }).filter(function (index) { return index >= 0; }).slice(0, 2);
+
+  if (!themeIndices.length) {
+    themeIndices = [42, 43].filter(function (index) { return index < databaseHeaders.length; });
+  } else if (themeIndices.length === 1 && databaseHeaders.length > 43) {
+    const fallbackThemeIndex = themeIndices[0] === 42 ? 43 : 42;
+    if (fallbackThemeIndex < databaseHeaders.length) themeIndices.push(fallbackThemeIndex);
+  }
+
+  return {
+    comparison: comparisonIndex,
+    themes: themeIndices,
+  };
+}
+
+function createSurpriseDialog() {
+  if (surpriseDialogParts) return surpriseDialogParts;
+
+  const dialog = document.createElement("dialog");
+  dialog.className = "surprise-dialog";
+  dialog.setAttribute("aria-label", "Surprise game");
+
+  const card = document.createElement("article");
+  card.className = "surprise-card";
+
+  const cardHeader = document.createElement("header");
+  cardHeader.className = "surprise-card-header";
+  const title = document.createElement("h2");
+  title.className = "surprise-game-title";
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "surprise-close";
+  closeButton.setAttribute("aria-label", "Close surprise game card");
+  closeButton.textContent = "×";
+  closeButton.addEventListener("click", function () { dialog.close(); });
+  cardHeader.append(title, closeButton);
+
+  const body = document.createElement("div");
+  body.className = "surprise-card-body";
+  const primary = document.createElement("section");
+  primary.className = "surprise-primary-fields";
+  primary.setAttribute("aria-label", "Game summary");
+  const tags = document.createElement("section");
+  tags.className = "surprise-tags";
+  tags.setAttribute("aria-label", "Comparison and themes");
+  const details = document.createElement("section");
+  details.className = "surprise-details";
+  details.setAttribute("aria-label", "Game details");
+  const links = document.createElement("section");
+  links.className = "surprise-links";
+  links.setAttribute("aria-label", "Game links and thumbnails");
+  body.append(primary, tags, details, links);
+  card.append(cardHeader, body);
+
+  dialog.appendChild(card);
+  document.body.appendChild(dialog);
+  dialog.addEventListener("click", function (event) {
+    if (event.target === dialog) dialog.close();
+  });
+
+  surpriseDialogParts = {
+    dialog: dialog,
+    title: title,
+    primary: primary,
+    tags: tags,
+    details: details,
+    links: links,
+  };
+  return surpriseDialogParts;
+}
+
+function appendSurpriseSectionHeading(parent, headingText) {
+  const heading = document.createElement("h3");
+  heading.className = "surprise-section-heading";
+  heading.textContent = headingText;
+  parent.appendChild(heading);
+}
+
+function appendSurpriseFact(parent, fieldIndex, value) {
+  if (!isMeaningfulGameValue(value)) return;
+  const fact = document.createElement("div");
+  fact.className = "surprise-primary-fact";
+  const label = document.createElement("span");
+  label.className = "surprise-field-label";
+  label.textContent = databaseHeaders[fieldIndex] || "Column " + (fieldIndex + 1);
+  const answer = document.createElement("span");
+  answer.className = "surprise-field-value";
+  answer.textContent = cleanGameValue(value);
+  fact.append(label, answer);
+  parent.appendChild(fact);
+}
+
+function splitGameTags(value) {
+  return cleanGameValue(value).split(/[,;|\n]+/).map(function (tag) {
+    return tag.trim();
+  }).filter(isMeaningfulGameValue);
+}
+
+function appendSurpriseTagGroup(parent, fieldIndex, value) {
+  if (fieldIndex < 0 || !isMeaningfulGameValue(value)) return;
+  const group = document.createElement("div");
+  group.className = "surprise-tag-group";
+  const label = document.createElement("h3");
+  label.className = "surprise-tag-heading";
+  label.textContent = databaseHeaders[fieldIndex] || "Tags";
+  const chipList = document.createElement("div");
+  chipList.className = "surprise-tag-list";
+  splitGameTags(value).forEach(function (tagText) {
+    const chip = document.createElement("span");
+    chip.className = "surprise-tag";
+    chip.textContent = tagText;
+    chipList.appendChild(chip);
+  });
+  if (!chipList.childElementCount) return;
+  group.append(label, chipList);
+  parent.appendChild(group);
+}
+
+function appendSurpriseDetails(parent, row, excludedFields) {
+  const detailFields = [];
+  for (let index = 6; index <= 38; index += 1) {
+    const field = "c" + index;
+    const value = cleanGameValue(row[field]);
+    if (excludedFields.has(index) || !isMeaningfulGameValue(value)) continue;
+    detailFields.push({ index: index, value: value });
+  }
+  if (!detailFields.length) return;
+
+  appendSurpriseSectionHeading(parent, "Game details");
+  const grid = document.createElement("div");
+  grid.className = "surprise-detail-grid";
+  detailFields.forEach(function (item) {
+    const entry = document.createElement("div");
+    const answerOnly = /^(y|yes)$/i.test(item.value);
+    entry.className = answerOnly ? "surprise-feature-chip" : "surprise-detail-item";
+    if (answerOnly) {
+      entry.textContent = databaseHeaders[item.index];
+    } else {
+      const label = document.createElement("span");
+      label.className = "surprise-detail-label";
+      label.textContent = databaseHeaders[item.index];
+      const value = document.createElement("span");
+      value.className = "surprise-detail-value";
+      value.textContent = item.value;
+      entry.append(label, value);
+    }
+    grid.appendChild(entry);
+  });
+  parent.appendChild(grid);
+}
+
+function getSurpriseLinkKind(url, label) {
+  let hostname = "";
+  try { hostname = new URL(url).hostname.toLocaleLowerCase(); } catch (_error) {}
+  const combined = (hostname + " " + label).toLocaleLowerCase();
+  if (/youtube|youtu\.be/.test(combined)) return "youtube";
+  if (/steampowered|steamcommunity/.test(combined)) return "steam";
+  if (/itch\.io/.test(combined)) return "itch";
+  return "website";
+}
+
+function getYoutubeVideoId(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.toLocaleLowerCase() === "youtu.be") return parsed.pathname.split("/").filter(Boolean)[0] || "";
+    const queryId = parsed.searchParams.get("v");
+    if (queryId) return queryId;
+    const pathMatch = parsed.pathname.match(/^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]+)/i);
+    return pathMatch ? pathMatch[1] : "";
+  } catch (_error) {
+    return "";
+  }
+}
+
+function getSurpriseThumbnailUrl(link) {
+  const kind = getSurpriseLinkKind(link.url, link.label);
+  if (kind === "youtube") {
+    const videoId = getYoutubeVideoId(link.url);
+    if (videoId) return "https://img.youtube.com/vi/" + encodeURIComponent(videoId) + "/mqdefault.jpg";
+  }
+  if (kind === "steam") {
+    const appMatch = link.url.match(/(?:store\.steampowered\.com|steamcommunity\.com)\/app\/(\d+)/i);
+    if (appMatch) return "https://cdn.akamai.steamstatic.com/steam/apps/" + appMatch[1] + "/header.jpg";
+  }
+  try {
+    const parsed = new URL(link.url);
+    return "https://www.google.com/s2/favicons?domain_url=" + encodeURIComponent(parsed.origin) + "&sz=128";
+  } catch (_error) {
+    return "";
+  }
+}
+
+function trackSurpriseLinkClick(row, link, index) {
+  let hostname = "";
+  try { hostname = new URL(link.url).hostname; } catch (_error) {}
+  sendUsageEvent("database_link_click", {
+    game_name: safeAnalyticsText(row.c0, 80),
+    column_name: safeAnalyticsText(databaseHeaders[index], 60) || "Game link",
+    link_domain: safeAnalyticsText(hostname, 100),
+    destination_url: analyticsDestinationUrl(link.url),
+  });
+}
+
+function appendSurpriseLinks(parent, row) {
+  const foundLinks = [1, 2].map(function (index) {
+    const url = cleanGameValue(row["url" + index]);
+    if (!/^https?:\/\//i.test(url)) return null;
+    return {
+      index: index,
+      url: url,
+      label: cleanGameValue(row["c" + index]),
+      kind: getSurpriseLinkKind(url, cleanGameValue(row["c" + index])),
+    };
+  }).filter(Boolean);
+  const order = { youtube: 0, steam: 1, website: 2, itch: 3 };
+  foundLinks.sort(function (a, b) { return order[a.kind] - order[b.kind]; });
+
+  appendSurpriseSectionHeading(parent, "Links");
+  if (!foundLinks.length) {
+    const message = document.createElement("p");
+    message.className = "surprise-no-links";
+    message.textContent = "No game links are listed.";
+    parent.appendChild(message);
+    return;
+  }
+
+  const linkList = document.createElement("div");
+  linkList.className = "surprise-link-list";
+  const thumbnails = document.createElement("div");
+  thumbnails.className = "surprise-thumbnail-list";
+  foundLinks.forEach(function (link) {
+    const kindLabel = { youtube: "YouTube", steam: "Steam", website: "Website", itch: "itch.io" }[link.kind];
+    const label = link.label || kindLabel;
+    const anchor = document.createElement("a");
+    anchor.href = link.url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.className = "surprise-game-link";
+    anchor.textContent = label;
+    anchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
+    linkList.appendChild(anchor);
+
+    const thumbnailAnchor = document.createElement("a");
+    thumbnailAnchor.href = link.url;
+    thumbnailAnchor.target = "_blank";
+    thumbnailAnchor.rel = "noopener noreferrer";
+    thumbnailAnchor.className = "surprise-thumbnail-link";
+    thumbnailAnchor.setAttribute("aria-label", label + " thumbnail (opens in a new tab)");
+    thumbnailAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
+    const thumbnailUrl = getSurpriseThumbnailUrl(link);
+    if (thumbnailUrl) {
+      const image = document.createElement("img");
+      image.src = thumbnailUrl;
+      image.alt = "";
+      image.loading = "lazy";
+      image.addEventListener("error", function () {
+        thumbnailAnchor.classList.add("thumbnail-unavailable");
+        image.remove();
+        thumbnailAnchor.textContent = kindLabel;
+      });
+      thumbnailAnchor.appendChild(image);
+    } else {
+      thumbnailAnchor.classList.add("thumbnail-unavailable");
+      thumbnailAnchor.textContent = kindLabel;
+    }
+    thumbnails.appendChild(thumbnailAnchor);
+  });
+  parent.append(linkList, thumbnails);
+}
+
+function renderSurpriseGame(row) {
+  const parts = createSurpriseDialog();
+  parts.title.textContent = cleanGameValue(row.c0) || "Untitled game";
+  parts.primary.replaceChildren();
+  parts.tags.replaceChildren();
+  parts.details.replaceChildren();
+  parts.links.replaceChildren();
+
+  [3, 4, 5].forEach(function (index) {
+    appendSurpriseFact(parts.primary, index, row["c" + index]);
+  });
+
+  const cardFields = findSurpriseCardFields();
+  appendSurpriseTagGroup(parts.tags, cardFields.comparison, row["c" + cardFields.comparison]);
+  cardFields.themes.forEach(function (index) {
+    appendSurpriseTagGroup(parts.tags, index, row["c" + index]);
+  });
+
+  const excludedDetailFields = new Set([5, cardFields.comparison].concat(cardFields.themes));
+  appendSurpriseDetails(parts.details, row, excludedDetailFields);
+  appendSurpriseLinks(parts.links, row);
+  if (!parts.primary.childElementCount) parts.primary.hidden = true;
+  else parts.primary.hidden = false;
+  if (!parts.tags.childElementCount) parts.tags.hidden = true;
+  else parts.tags.hidden = false;
+  if (!parts.details.childElementCount) parts.details.hidden = true;
+  else parts.details.hidden = false;
+
+  if (!parts.dialog.open) parts.dialog.showModal();
+}
+
+function openSurpriseMe() {
+  if (!table) return;
+  const activeRows = table.getData("active");
+  const eligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
+  if (!eligibleRows.length) {
+    setStatus("No games with at least 3 data points match the current search and filters.", true);
+    return;
+  }
+  const selected = eligibleRows[Math.floor(Math.random() * eligibleRows.length)];
+  renderSurpriseGame(selected);
 }
 
 function globalSearchFilter(rowData) {
@@ -912,6 +1257,13 @@ function addColumnPicker(columns) {
   toggleButton.setAttribute("aria-controls", "column-picker-menu");
   columnPickerToggleButton = toggleButton;
 
+  const surpriseButton = document.createElement("button");
+  surpriseButton.id = "surprise-me-button";
+  surpriseButton.type = "button";
+  surpriseButton.textContent = "Surprise me";
+  surpriseButton.setAttribute("aria-label", "Show a random game matching the current filters");
+  surpriseButton.addEventListener("click", openSurpriseMe);
+
   const comparisonSelect = document.createElement("select");
   comparisonSelect.id = "comparison-game-filter";
   comparisonSelect.className = "comparison-filter-select";
@@ -929,7 +1281,7 @@ function addColumnPicker(columns) {
   comparisonFilterSelect = comparisonSelect;
   comparisonSelect.disabled = !comparisonFilterField;
   if (!comparisonFilterField) comparisonSelect.title = "The database feed does not include a Comparison column.";
-  actionRow.append(comparisonSelect, toggleButton);
+  actionRow.append(comparisonSelect, toggleButton, surpriseButton);
 
   comparisonSelect.addEventListener("change", function () {
     if (!comparisonFilterField) return;
