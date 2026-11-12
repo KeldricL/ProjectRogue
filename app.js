@@ -785,6 +785,29 @@ function cleanGameValue(value) {
   return String(value == null ? "" : value).trim();
 }
 
+function isMeaningfulGameValue(value) {
+  const cleaned = cleanGameValue(value);
+  return Boolean(cleaned) && !NON_DATA_VALUES.has(cleaned.toLocaleLowerCase());
+}
+
+function findSurpriseCardFields() {
+  const normalizedHeaders = databaseHeaders.map(function (header) {
+    return cleanGameValue(header).replace(/[?]/g, "").replace(/\s+/g, " ").toLocaleLowerCase();
+  });
+  const comparison = normalizedHeaders.findIndex(function (header) {
+    return header === "comparison";
+  });
+  let gameTypes = [];
+  let themes = [];
+  normalizedHeaders.forEach(function (header, index) {
+    if (/^(?:main\s+)?game\s+type(?:\s+\d+)?$/.test(header)) gameTypes.push(index);
+    if (/^(?:main\s+)?theme(?:\s+\d+)?$/.test(header)) themes.push(index);
+  });
+  if (!gameTypes.length) gameTypes = [6, 7, 8].filter(function (index) { return index < databaseHeaders.length; });
+  if (!themes.length) themes = [42, 43].filter(function (index) { return index < databaseHeaders.length; });
+  return { comparison: comparison, gameTypes: gameTypes, themes: themes };
+}
+
 function hasAtLeastThreeDataPoints(row) {
   let count = 0;
   for (let index = 5; index <= 38; index += 1) {
@@ -1223,7 +1246,7 @@ function openSurpriseMe() {
     renderSurpriseGame(selected);
   } catch (error) {
     console.error("Surprise Me could not open:", error);
-    setStatus("Surprise Me could not open. Please reload the database and try again.", true);
+    setStatus("Surprise Me could not open: " + error.message, true);
   }
 }
 
@@ -1374,15 +1397,15 @@ function addColumnPicker(columns) {
 
   const actionRow = document.createElement("div");
   actionRow.className = "header-button-row";
-  const fullscreenRow = document.createElement("div");
-  fullscreenRow.className = "header-button-row";
+  const surpriseControlsRow = document.createElement("div");
+  surpriseControlsRow.className = "header-button-row surprise-controls-row";
   if (fullscreenButton && fullscreenButton.parentElement === headerActions) {
     headerActions.insertBefore(actionRow, fullscreenButton);
-    headerActions.insertBefore(fullscreenRow, fullscreenButton);
-    fullscreenRow.appendChild(fullscreenButton);
+    headerActions.insertBefore(surpriseControlsRow, fullscreenButton);
+    surpriseControlsRow.appendChild(fullscreenButton);
   } else {
-    headerActions.append(actionRow, fullscreenRow);
-    if (fullscreenButton) fullscreenRow.appendChild(fullscreenButton);
+    headerActions.append(actionRow, surpriseControlsRow);
+    if (fullscreenButton) surpriseControlsRow.appendChild(fullscreenButton);
   }
 
   const toggleButton = document.createElement("button");
@@ -1417,7 +1440,8 @@ function addColumnPicker(columns) {
   comparisonFilterSelect = comparisonSelect;
   comparisonSelect.disabled = !comparisonFilterField;
   if (!comparisonFilterField) comparisonSelect.title = "The database feed does not include a Comparison column.";
-  actionRow.append(comparisonSelect, toggleButton, surpriseButton);
+  actionRow.append(comparisonSelect, toggleButton);
+  surpriseControlsRow.append(surpriseButton, fullscreenButton);
 
   comparisonSelect.addEventListener("change", function () {
     if (!comparisonFilterField) return;

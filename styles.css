@@ -365,6 +365,8 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .search-label { grid-column: 1; }
   .header-button-row { flex-direction: column; align-items: stretch; }
   .header-button-row button { width: 100%; }
+  .header-button-row.surprise-controls-row { flex-direction: row; align-items: stretch; }
+  .header-button-row.surprise-controls-row button { width: auto; flex: 1 1 0; }
   .comparison-filter-select { width: 100%; max-width: none; }
   .surprise-dialog { width: calc(100vw - 16px); max-height: 94vh; max-height: 94dvh; }
   .surprise-dialog-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "card card" "previous next"; gap: 9px 12px; }
