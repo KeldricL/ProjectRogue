@@ -656,12 +656,12 @@ function normalizeResponse(payload) {
     return "c" + index;
   });
   databaseHeaders = payload.headers.map(function (header, index) {
-    const label = header == null ? "" : String(header).trim();
+    const label = header == null ? "" : String(header).replace(/\?+/g, "").trim();
     return label || "Column " + (index + 1);
   });
   comparisonFilterField = "";
   payload.headers.some(function (header, index) {
-    if (String(header == null ? "" : header).trim().toLocaleLowerCase() !== "comparison") return false;
+    if (String(header == null ? "" : header).replace(/\?+/g, "").trim().toLocaleLowerCase() !== "comparison") return false;
     comparisonFilterField = "c" + index;
     return true;
   });
@@ -670,9 +670,7 @@ function normalizeResponse(payload) {
 
   const columns = payload.headers.map(function (header, index) {
     const definition = {
-      title: header == null || String(header).trim() === ""
-        ? "Column " + (index + 1)
-        : String(header),
+      title: databaseHeaders[index],
       field: "c" + index,
       visible: index === 0 || (index !== 46 && !hiddenColumnFields.has("c" + index)),
       headerFilter: createColumnHeaderFilter,
@@ -800,6 +798,9 @@ function findSurpriseCardFields() {
   const comparisonIndex = databaseHeaders.findIndex(function (header) {
     return header.toLocaleLowerCase().includes("comparison");
   });
+  const gameTypeIndices = databaseHeaders.map(function (header, index) {
+    return /game\s*type/i.test(header) ? index : -1;
+  }).filter(function (index) { return index >= 0; });
   let themeIndices = databaseHeaders.map(function (header, index) {
     return /\bthemes?\b/i.test(header) ? index : -1;
   }).filter(function (index) { return index >= 0; }).slice(0, 2);
@@ -814,6 +815,7 @@ function findSurpriseCardFields() {
   return {
     comparison: comparisonIndex,
     themes: themeIndices,
+    gameTypes: gameTypeIndices,
   };
 }
 
@@ -922,35 +924,58 @@ function appendSurpriseTagGroup(parent, fieldIndex, value) {
 
 function appendSurpriseDetails(parent, row, excludedFields) {
   const detailFields = [];
+  const yesFeatures = [];
   for (let index = 6; index <= 38; index += 1) {
     const field = "c" + index;
     const value = cleanGameValue(row[field]);
     if (excludedFields.has(index) || !isMeaningfulGameValue(value)) continue;
+    if (/^(y|yes)$/i.test(value)) {
+      yesFeatures.push(databaseHeaders[index]);
+      continue;
+    }
     detailFields.push({ index: index, value: value });
   }
-  if (!detailFields.length) return;
+  if (!detailFields.length && !yesFeatures.length) return;
 
   appendSurpriseSectionHeading(parent, "Game details");
-  const grid = document.createElement("div");
-  grid.className = "surprise-detail-grid";
-  detailFields.forEach(function (item) {
-    const entry = document.createElement("div");
-    const answerOnly = /^(y|yes)$/i.test(item.value);
-    entry.className = answerOnly ? "surprise-feature-chip" : "surprise-detail-item";
-    if (answerOnly) {
-      entry.textContent = databaseHeaders[item.index];
-    } else {
+  if (detailFields.length) {
+    const grid = document.createElement("div");
+    grid.className = "surprise-detail-grid";
+    detailFields.forEach(function (item) {
+      const entry = document.createElement("div");
+      entry.className = "surprise-detail-item";
       const label = document.createElement("span");
       label.className = "surprise-detail-label";
       label.textContent = databaseHeaders[item.index];
+      const separator = document.createElement("span");
+      separator.className = "surprise-detail-separator";
+      separator.textContent = "—";
       const value = document.createElement("span");
       value.className = "surprise-detail-value";
       value.textContent = item.value;
-      entry.append(label, value);
-    }
-    grid.appendChild(entry);
-  });
-  parent.appendChild(grid);
+      entry.append(label, separator, value);
+      grid.appendChild(entry);
+    });
+    parent.appendChild(grid);
+  }
+
+  if (yesFeatures.length) {
+    const featureSection = document.createElement("div");
+    featureSection.className = "surprise-feature-section";
+    const featureHeading = document.createElement("h4");
+    featureHeading.className = "surprise-feature-heading";
+    featureHeading.textContent = "Features";
+    const featureList = document.createElement("div");
+    featureList.className = "surprise-feature-list";
+    yesFeatures.forEach(function (featureTitle) {
+      const chip = document.createElement("span");
+      chip.className = "surprise-feature-chip";
+      chip.textContent = featureTitle;
+      featureList.appendChild(chip);
+    });
+    featureSection.append(featureHeading, featureList);
+    parent.appendChild(featureSection);
+  }
 }
 
 function getSurpriseLinkKind(url, label) {
@@ -976,22 +1001,32 @@ function getYoutubeVideoId(url) {
   }
 }
 
-function getSurpriseThumbnailUrl(link) {
+function getSurpriseThumbnailCandidates(link) {
   const kind = getSurpriseLinkKind(link.url, link.label);
+  const candidates = [];
   if (kind === "youtube") {
     const videoId = getYoutubeVideoId(link.url);
-    if (videoId) return "https://img.youtube.com/vi/" + encodeURIComponent(videoId) + "/mqdefault.jpg";
+    if (videoId) candidates.push("https://img.youtube.com/vi/" + encodeURIComponent(videoId) + "/mqdefault.jpg");
   }
   if (kind === "steam") {
     const appMatch = link.url.match(/(?:store\.steampowered\.com|steamcommunity\.com)\/app\/(\d+)/i);
-    if (appMatch) return "https://cdn.akamai.steamstatic.com/steam/apps/" + appMatch[1] + "/header.jpg";
+    if (appMatch) {
+      const appId = appMatch[1];
+      candidates.push(
+        "https://shared.steamstatic.com/store_item_assets/steam/apps/" + appId + "/header.jpg",
+        "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + appId + "/header.jpg",
+        "https://cdn.akamai.steamstatic.com/steam/apps/" + appId + "/header.jpg",
+        "https://cdn.akamai.steamstatic.com/steam/apps/" + appId + "/capsule_231x87.jpg"
+      );
+    }
   }
   try {
     const parsed = new URL(link.url);
-    return "https://www.google.com/s2/favicons?domain_url=" + encodeURIComponent(parsed.origin) + "&sz=128";
+    candidates.push("https://www.google.com/s2/favicons?domain_url=" + encodeURIComponent(parsed.origin) + "&sz=128");
   } catch (_error) {
-    return "";
+    return candidates;
   }
+  return candidates;
 }
 
 function trackSurpriseLinkClick(row, link, index) {
@@ -1051,18 +1086,24 @@ function appendSurpriseLinks(parent, row) {
     thumbnailAnchor.className = "surprise-thumbnail-link";
     thumbnailAnchor.setAttribute("aria-label", label + " thumbnail (opens in a new tab)");
     thumbnailAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
-    const thumbnailUrl = getSurpriseThumbnailUrl(link);
-    if (thumbnailUrl) {
+    const thumbnailCandidates = getSurpriseThumbnailCandidates(link);
+    if (thumbnailCandidates.length) {
       const image = document.createElement("img");
-      image.src = thumbnailUrl;
       image.alt = "";
       image.loading = "lazy";
+      let thumbnailCandidateIndex = 0;
       image.addEventListener("error", function () {
-        thumbnailAnchor.classList.add("thumbnail-unavailable");
-        image.remove();
-        thumbnailAnchor.textContent = kindLabel;
+        thumbnailCandidateIndex += 1;
+        if (thumbnailCandidateIndex < thumbnailCandidates.length) {
+          image.src = thumbnailCandidates[thumbnailCandidateIndex];
+        } else {
+          thumbnailAnchor.classList.add("thumbnail-unavailable");
+          image.remove();
+          thumbnailAnchor.textContent = kindLabel;
+        }
       });
       thumbnailAnchor.appendChild(image);
+      image.src = thumbnailCandidates[0];
     } else {
       thumbnailAnchor.classList.add("thumbnail-unavailable");
       thumbnailAnchor.textContent = kindLabel;
@@ -1085,12 +1126,25 @@ function renderSurpriseGame(row) {
   });
 
   const cardFields = findSurpriseCardFields();
-  appendSurpriseTagGroup(parts.tags, cardFields.comparison, row["c" + cardFields.comparison]);
-  cardFields.themes.forEach(function (index) {
-    appendSurpriseTagGroup(parts.tags, index, row["c" + index]);
+  const tagColumns = document.createElement("div");
+  tagColumns.className = "surprise-tag-columns";
+  const gameTypeColumn = document.createElement("div");
+  gameTypeColumn.className = "surprise-tag-column surprise-game-types-column";
+  const categoryColumn = document.createElement("div");
+  categoryColumn.className = "surprise-tag-column surprise-category-tags-column";
+  cardFields.gameTypes.forEach(function (index) {
+    appendSurpriseTagGroup(gameTypeColumn, index, row["c" + index]);
   });
+  appendSurpriseTagGroup(categoryColumn, cardFields.comparison, row["c" + cardFields.comparison]);
+  cardFields.themes.forEach(function (index) {
+    appendSurpriseTagGroup(categoryColumn, index, row["c" + index]);
+  });
+  if (gameTypeColumn.childElementCount) tagColumns.appendChild(gameTypeColumn);
+  if (categoryColumn.childElementCount) tagColumns.appendChild(categoryColumn);
+  if (tagColumns.childElementCount === 1) tagColumns.classList.add("single-tag-column");
+  if (tagColumns.childElementCount) parts.tags.appendChild(tagColumns);
 
-  const excludedDetailFields = new Set([5, cardFields.comparison].concat(cardFields.themes));
+  const excludedDetailFields = new Set([5, cardFields.comparison].concat(cardFields.themes, cardFields.gameTypes));
   appendSurpriseDetails(parts.details, row, excludedDetailFields);
   appendSurpriseLinks(parts.links, row);
   if (!parts.primary.childElementCount) parts.primary.hidden = true;

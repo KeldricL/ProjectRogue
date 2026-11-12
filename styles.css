@@ -273,7 +273,10 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-primary-fact { min-width: 0; padding: 10px 12px; border: 1px solid #3e4a4c; border-radius: 8px; background: #252d30; }
 .surprise-field-label, .surprise-detail-label { display: block; margin-bottom: 4px; color: #aebbb7; font-size: .77rem; font-weight: 700; letter-spacing: .025em; }
 .surprise-field-value { display: block; color: #f1f5f3; font-weight: 650; overflow-wrap: anywhere; }
-.surprise-tags { display: grid; gap: 12px; margin: 4px 0 18px; }
+.surprise-tags { margin: 4px 0 18px; }
+.surprise-tag-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.surprise-tag-columns.single-tag-column { grid-template-columns: minmax(0, 1fr); }
+.surprise-tag-column { display: grid; align-content: start; gap: 12px; min-width: 0; }
 .surprise-tag-group { display: grid; gap: 7px; }
 .surprise-tag-heading, .surprise-section-heading { margin: 0; color: #bac3ce; font-size: .86rem; font-weight: 700; }
 .surprise-tag-list { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -281,17 +284,21 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-details { margin-top: 8px; }
 .surprise-section-heading { margin-bottom: 9px; color: #b8efc3; font-size: .98rem; }
 .surprise-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 9px; }
-.surprise-detail-item { min-width: 0; padding: 9px 11px; border: 1px solid #303b3e; border-radius: 7px; background: #202729; }
-.surprise-detail-item .surprise-detail-label { margin: 0 0 3px; }
-.surprise-detail-value { display: block; color: #e8edf5; overflow-wrap: anywhere; }
-.surprise-feature-chip { display: flex; align-items: center; min-height: 36px; padding: 7px 11px; border: 1px solid #3f7650; border-radius: 999px; background: #23372a; color: #b8efc3; font-size: .84rem; font-weight: 650; line-height: 1.25; }
+.surprise-detail-item { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 7px; min-width: 0; padding: 9px 11px; border: 1px solid #303b3e; border-radius: 7px; background: #202729; }
+.surprise-detail-item .surprise-detail-label { display: inline; flex: 0 1 auto; margin: 0; }
+.surprise-detail-separator { color: #83cf9a; font-weight: 800; }
+.surprise-detail-value { display: inline; min-width: 0; color: #e8edf5; overflow-wrap: anywhere; }
+.surprise-feature-chip { display: inline-flex; justify-self: start; width: fit-content; max-width: 100%; align-items: center; min-height: 36px; padding: 7px 11px; border: 1px solid #3f7650; border-radius: 999px; background: #23372a; color: #b8efc3; font-size: .84rem; font-weight: 650; line-height: 1.25; }
+.surprise-feature-section { margin-top: 12px; }
+.surprise-feature-heading { margin: 0 0 7px; color: #b8efc3; font-size: .84rem; font-weight: 750; }
+.surprise-feature-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 7px; }
 .surprise-links { margin-top: 20px; padding-top: 14px; border-top: 1px solid #41494d; }
 .surprise-link-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .surprise-game-link { display: inline-flex; align-items: center; min-height: 36px; padding: 7px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
 .surprise-game-link:hover { border-color: #83cf9a; background: #304237; }
 .surprise-thumbnail-list { display: flex; flex-wrap: wrap; gap: 9px; }
 .surprise-thumbnail-link { display: flex; width: min(180px, calc(50% - 5px)); height: 102px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
-.surprise-thumbnail-link img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.surprise-thumbnail-link img { display: block; width: 100%; height: 100%; padding: 2px; object-fit: contain; }
 .surprise-thumbnail-link.thumbnail-unavailable { font-size: .82rem; font-weight: 700; }
 .surprise-no-links { margin: 0; color: #aeb8bf; }
 .surprise-dialog[open] { display: flex; flex-direction: column; gap: 12px; }
