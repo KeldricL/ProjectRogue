@@ -1041,7 +1041,7 @@ function appendSurpriseDetails(parent, row, excludedFields) {
     parent.appendChild(grid);
   }
 
-  if (yesFeatures.length) {
+  if (yesFeatures.size) {
     const featureSection = document.createElement("div");
     featureSection.className = "surprise-feature-section";
     const featureHeading = document.createElement("h4");
