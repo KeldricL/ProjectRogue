@@ -233,7 +233,7 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .game-note-indicator:hover { background: #3c5844; color: #fff; }
 
 .surprise-dialog {
-  width: min(660px, calc(100vw - 28px));
+  width: min(790px, calc(100vw - 20px));
   max-width: none;
   max-height: 92vh;
   max-height: 92dvh;
@@ -244,7 +244,11 @@ button:hover { border-color: #6dc583; background: #30393a; }
   color: #e8edf5;
 }
 .surprise-dialog::backdrop { background: #080b0de0; backdrop-filter: blur(3px); }
+.surprise-dialog-layout { display: grid; grid-template-columns: 38px minmax(0, 1fr) 38px; gap: 10px; align-items: center; width: 100%; }
+.surprise-nav-button { display: flex; width: 38px; min-height: 38px; align-items: center; justify-content: center; padding: 0; border-color: #596560; border-radius: 8px; color: #b8efc3; font-size: 1.8rem; line-height: 1; }
+.surprise-nav-button[hidden] { display: none !important; }
 .surprise-card {
+  grid-column: 2;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -293,15 +297,15 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-feature-heading { margin: 0 0 7px; color: #b8efc3; font-size: .84rem; font-weight: 750; }
 .surprise-feature-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 7px; }
 .surprise-links { margin-top: 20px; padding-top: 14px; border-top: 1px solid #41494d; }
-.surprise-link-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.surprise-link-cards { display: flex; flex-wrap: wrap; gap: 10px; }
+.surprise-link-card { display: flex; flex: 0 1 180px; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
 .surprise-game-link { display: inline-flex; align-items: center; min-height: 36px; padding: 7px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
 .surprise-game-link:hover { border-color: #83cf9a; background: #304237; }
-.surprise-thumbnail-list { display: flex; flex-wrap: wrap; gap: 9px; }
-.surprise-thumbnail-link { display: flex; width: min(180px, calc(50% - 5px)); height: 102px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
+.surprise-thumbnail-link { display: flex; width: 100%; height: 102px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
 .surprise-thumbnail-link img { display: block; width: 100%; height: 100%; padding: 2px; object-fit: contain; }
 .surprise-thumbnail-link.thumbnail-unavailable { font-size: .82rem; font-weight: 700; }
 .surprise-no-links { margin: 0; color: #aeb8bf; }
-.surprise-dialog[open] { display: flex; flex-direction: column; gap: 12px; }
+.surprise-dialog[open] { display: block; }
 .surprise-primary-fields[hidden], .surprise-tags[hidden], .surprise-details[hidden] { display: none; }
 
 .tabulator-tooltip {
@@ -352,12 +356,16 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .header-button-row button { width: 100%; }
   .comparison-filter-select { width: 100%; max-width: none; }
   .surprise-dialog { width: calc(100vw - 16px); max-height: 94vh; max-height: 94dvh; }
-  .surprise-card { max-height: 94vh; max-height: 94dvh; }
+  .surprise-dialog-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "card card" "previous next"; gap: 9px 12px; }
+  .surprise-card { grid-area: card; }
+  .surprise-previous { grid-area: previous; justify-self: start; }
+  .surprise-next { grid-area: next; justify-self: end; }
+  .surprise-card { max-height: calc(94vh - 55px); max-height: calc(94dvh - 55px); }
   .surprise-card-header { padding: 13px 14px; }
   .surprise-card-body { padding: 13px 14px 17px; }
   .surprise-primary-fields { grid-template-columns: 1fr; }
   .surprise-detail-grid { grid-template-columns: 1fr; }
-  .surprise-thumbnail-link { width: calc(50% - 5px); height: auto; aspect-ratio: 16 / 9; }
+  .surprise-thumbnail-link { height: auto; aspect-ratio: 16 / 9; }
   .column-picker-menu { position: fixed; top: 50%; right: auto; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 24px)); max-height: min(70vh, 520px); }
   .column-value-menu { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 20px)); max-height: min(72vh, 560px); }
   .table-frame { height: 65vh; min-height: 360px; border-radius: 6px; }

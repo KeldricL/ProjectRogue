@@ -45,6 +45,9 @@ let columnPickerMenu = null;
 let comparisonFilterSelect = null;
 let comparisonFilterField = "";
 let surpriseDialogParts = null;
+let surpriseEligibleRows = [];
+let surpriseHistory = [];
+let surpriseHistoryIndex = -1;
 let syncColumnPickerCheckboxes = function () {};
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
@@ -826,6 +829,26 @@ function createSurpriseDialog() {
   dialog.className = "surprise-dialog";
   dialog.setAttribute("aria-label", "Surprise game");
 
+  const layout = document.createElement("div");
+  layout.className = "surprise-dialog-layout";
+
+  const previousButton = document.createElement("button");
+  previousButton.type = "button";
+  previousButton.className = "surprise-nav-button surprise-previous";
+  previousButton.setAttribute("aria-label", "Previous surprise game");
+  previousButton.title = "Previous game";
+  previousButton.textContent = "‹";
+  previousButton.hidden = true;
+  previousButton.addEventListener("click", function () { moveSurpriseHistory(-1); });
+
+  const nextButton = document.createElement("button");
+  nextButton.type = "button";
+  nextButton.className = "surprise-nav-button surprise-next";
+  nextButton.setAttribute("aria-label", "Another random game");
+  nextButton.title = "Another random game";
+  nextButton.textContent = "›";
+  nextButton.addEventListener("click", function () { moveSurpriseHistory(1); });
+
   const card = document.createElement("article");
   card.className = "surprise-card";
 
@@ -858,7 +881,8 @@ function createSurpriseDialog() {
   body.append(primary, tags, details, links);
   card.append(cardHeader, body);
 
-  dialog.appendChild(card);
+  layout.append(previousButton, card, nextButton);
+  dialog.appendChild(layout);
   document.body.appendChild(dialog);
   dialog.addEventListener("click", function (event) {
     if (event.target === dialog) dialog.close();
@@ -866,6 +890,9 @@ function createSurpriseDialog() {
 
   surpriseDialogParts = {
     dialog: dialog,
+    previousButton: previousButton,
+    nextButton: nextButton,
+    body: body,
     title: title,
     primary: primary,
     tags: tags,
@@ -1063,13 +1090,13 @@ function appendSurpriseLinks(parent, row) {
     return;
   }
 
-  const linkList = document.createElement("div");
-  linkList.className = "surprise-link-list";
-  const thumbnails = document.createElement("div");
-  thumbnails.className = "surprise-thumbnail-list";
+  const linkCards = document.createElement("div");
+  linkCards.className = "surprise-link-cards";
   foundLinks.forEach(function (link) {
     const kindLabel = { youtube: "YouTube", steam: "Steam", website: "Website", itch: "itch.io" }[link.kind];
     const label = link.label || kindLabel;
+    const linkCard = document.createElement("div");
+    linkCard.className = "surprise-link-card";
     const anchor = document.createElement("a");
     anchor.href = link.url;
     anchor.target = "_blank";
@@ -1077,7 +1104,7 @@ function appendSurpriseLinks(parent, row) {
     anchor.className = "surprise-game-link";
     anchor.textContent = label;
     anchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
-    linkList.appendChild(anchor);
+    linkCard.appendChild(anchor);
 
     const thumbnailAnchor = document.createElement("a");
     thumbnailAnchor.href = link.url;
@@ -1108,9 +1135,10 @@ function appendSurpriseLinks(parent, row) {
       thumbnailAnchor.classList.add("thumbnail-unavailable");
       thumbnailAnchor.textContent = kindLabel;
     }
-    thumbnails.appendChild(thumbnailAnchor);
+    linkCard.appendChild(thumbnailAnchor);
+    linkCards.appendChild(linkCard);
   });
-  parent.append(linkList, thumbnails);
+  parent.appendChild(linkCards);
 }
 
 function renderSurpriseGame(row) {
@@ -1154,19 +1182,47 @@ function renderSurpriseGame(row) {
   if (!parts.details.childElementCount) parts.details.hidden = true;
   else parts.details.hidden = false;
 
+  parts.previousButton.hidden = surpriseHistoryIndex <= 0;
   if (!parts.dialog.open) parts.dialog.showModal();
+  else parts.body.scrollTop = 0;
 }
 
 function openSurpriseMe() {
   if (!table) return;
   const activeRows = table.getData("active");
-  const eligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
-  if (!eligibleRows.length) {
+  surpriseEligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
+  if (!surpriseEligibleRows.length) {
     setStatus("No games with at least 3 data points match the current search and filters.", true);
     return;
   }
-  const selected = eligibleRows[Math.floor(Math.random() * eligibleRows.length)];
+  const selected = surpriseEligibleRows[Math.floor(Math.random() * surpriseEligibleRows.length)];
+  surpriseHistory = [selected];
+  surpriseHistoryIndex = 0;
   renderSurpriseGame(selected);
+}
+
+function moveSurpriseHistory(direction) {
+  if (direction < 0) {
+    if (surpriseHistoryIndex <= 0) return;
+    surpriseHistoryIndex -= 1;
+    renderSurpriseGame(surpriseHistory[surpriseHistoryIndex]);
+    return;
+  }
+
+  if (surpriseHistoryIndex < surpriseHistory.length - 1) {
+    surpriseHistoryIndex += 1;
+    renderSurpriseGame(surpriseHistory[surpriseHistoryIndex]);
+    return;
+  }
+
+  if (!surpriseEligibleRows.length) return;
+  const currentRow = surpriseHistory[surpriseHistoryIndex];
+  const options = surpriseEligibleRows.filter(function (row) { return row !== currentRow; });
+  const pool = options.length ? options : surpriseEligibleRows;
+  const nextRow = pool[Math.floor(Math.random() * pool.length)];
+  surpriseHistory.push(nextRow);
+  surpriseHistoryIndex += 1;
+  renderSurpriseGame(nextRow);
 }
 
 function globalSearchFilter(rowData) {
