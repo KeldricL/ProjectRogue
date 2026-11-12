@@ -993,26 +993,29 @@ function appendSurpriseTagGroup(parent, fieldIndex, value) {
 function appendSurpriseDetails(parent, row, excludedFields) {
   const detailFields = [];
   const yesFeatures = new Set();
-  const yesOnlyFeatureFields = new Set([39, 40, 41]); // AN, AO, AP
-  for (let index = 6; index <= 41; index += 1) {
+  const alwaysGreenHeaders = new Set(["dlc", "achievements", "workshop"]);
+  const alwaysGreenFields = new Set();
+  databaseHeaders.forEach(function (header, index) {
+    const normalizedHeader = cleanGameValue(header).replace(/[?]/g, "").toLocaleLowerCase();
+    if (alwaysGreenHeaders.has(normalizedHeader)) alwaysGreenFields.add(index);
+  });
+
+  for (let index = 6; index < databaseHeaders.length; index += 1) {
+    const isAlwaysGreenField = alwaysGreenFields.has(index);
+    if (index > 38 && !isAlwaysGreenField) continue;
     const field = "c" + index;
     const value = cleanGameValue(row[field]);
-    if (excludedFields.has(index) || !isMeaningfulGameValue(value)) continue;
-    if (yesOnlyFeatureFields.has(index)) {
-      if (/^y$/i.test(value)) yesFeatures.add(databaseHeaders[index]);
+    if (excludedFields.has(index)) continue;
+    if (isAlwaysGreenField) {
+      if (value && value.toLocaleLowerCase() !== "n") yesFeatures.add(databaseHeaders[index]);
       continue;
     }
+    if (!isMeaningfulGameValue(value)) continue;
     if (/^(y|yes)$/i.test(value)) {
       yesFeatures.add(databaseHeaders[index]);
       continue;
     }
     detailFields.push({ index: index, value: value });
-  }
-  const achievementsIndex = databaseHeaders.findIndex(function (header) {
-    return /\bachievements?\b/i.test(cleanGameValue(header));
-  });
-  if (achievementsIndex >= 0 && /^y$/i.test(cleanGameValue(row["c" + achievementsIndex]))) {
-    yesFeatures.add(databaseHeaders[achievementsIndex]);
   }
   if (!detailFields.length && !yesFeatures.size) return;
 
