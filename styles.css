@@ -404,3 +404,38 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   html:fullscreen .page-shell { padding: 8px; }
   html:fullscreen .table-frame { min-height: 0; }
 }
+
+/* Compact game-card layout for phone screens. */
+@media (max-width: 600px) {
+  .surprise-dialog { width: calc(100vw - 24px); max-height: 90vh; max-height: 90dvh; }
+  .surprise-dialog-layout { gap: 6px 10px; }
+  .surprise-card { max-height: calc(90vh - 48px); max-height: calc(90dvh - 48px); }
+  .surprise-card-header { gap: 8px; padding: 8px 10px; }
+  .surprise-game-title { font-size: clamp(1.2rem, 5.6vw, 1.55rem); line-height: 1.15; }
+  .surprise-game-note { margin-top: 4px; font-size: .8rem; line-height: 1.3; }
+  .surprise-close { width: 34px; min-height: 34px; font-size: 1.4rem; }
+  .surprise-card-body { padding: 9px 10px 12px; }
+  .surprise-primary-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 9px; }
+  .surprise-primary-fact { padding: 6px 8px; border-radius: 6px; }
+  .surprise-field-label, .surprise-detail-label { margin-bottom: 2px; font-size: .69rem; }
+  .surprise-field-value { font-size: .84rem; line-height: 1.25; }
+  .surprise-tags { margin: 2px 0 10px; }
+  .surprise-tag-columns { gap: 9px; }
+  .surprise-tag-column { gap: 8px; }
+  .surprise-tag-group { gap: 4px; }
+  .surprise-tag-heading, .surprise-section-heading { font-size: .78rem; }
+  .surprise-tag-list, .surprise-feature-list { gap: 5px; }
+  .surprise-tag { min-height: 25px; padding: 3px 8px; font-size: .75rem; }
+  .surprise-details { margin-top: 5px; }
+  .surprise-section-heading { margin-bottom: 6px; }
+  .surprise-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .surprise-detail-item { gap: 3px 5px; padding: 6px 7px; border-radius: 6px; font-size: .78rem; line-height: 1.25; }
+  .surprise-detail-item .surprise-detail-label { font-size: .67rem; }
+  .surprise-feature-section { margin-top: 8px; }
+  .surprise-feature-heading { margin-bottom: 5px; font-size: .77rem; }
+  .surprise-feature-chip { min-height: 29px; padding: 5px 8px; font-size: .75rem; }
+  .surprise-links { margin-top: 12px; padding-top: 9px; }
+  .surprise-link-card { gap: 5px; }
+  .surprise-game-link { min-height: 30px; padding: 5px 8px; font-size: .8rem; }
+  .surprise-thumbnail-link { max-height: 86px; }
+}
