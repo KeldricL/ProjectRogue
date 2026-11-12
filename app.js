@@ -1009,7 +1009,7 @@ function appendSurpriseDetails(parent, row, excludedFields) {
     detailFields.push({ index: index, value: value });
   }
   const achievementsIndex = databaseHeaders.findIndex(function (header) {
-    return cleanGameValue(header).toLocaleLowerCase() === "achievements";
+    return /\bachievements?\b/i.test(cleanGameValue(header));
   });
   if (achievementsIndex >= 0 && /^y$/i.test(cleanGameValue(row["c" + achievementsIndex]))) {
     yesFeatures.add(databaseHeaders[achievementsIndex]);
