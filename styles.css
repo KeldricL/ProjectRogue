@@ -53,7 +53,7 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .tabulator .tabulator-placeholder { color: #aab4bb; }
 .tabulator .tabulator-footer { border-top: 1px solid #465055; background: #252b2e; color: #e8edf1; }
 .page-footer { display: flex; justify-content: space-between; gap: 12px; padding: 10px 2px 0; color: #aeb8bf; font-size: .82rem; }
-.header-button-row { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; }
+.header-button-row { grid-column: 1 / -1; display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 8px; }
 .header-button-row button { width: auto; }
 .comparison-filter-select { min-height: 42px; max-width: 250px; padding: 8px 30px 8px 11px; border: 1px solid #4b555a; border-radius: 7px; background: #252b2e; color: #eef2f4; font: inherit; font-weight: 650; cursor: pointer; }
 .comparison-filter-select:hover { border-color: #6dc583; background: #30393a; }

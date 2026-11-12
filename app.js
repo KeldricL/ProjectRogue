@@ -893,11 +893,15 @@ function addColumnPicker(columns) {
 
   const actionRow = document.createElement("div");
   actionRow.className = "header-button-row";
+  const fullscreenRow = document.createElement("div");
+  fullscreenRow.className = "header-button-row";
   if (fullscreenButton && fullscreenButton.parentElement === headerActions) {
     headerActions.insertBefore(actionRow, fullscreenButton);
-    actionRow.appendChild(fullscreenButton);
+    headerActions.insertBefore(fullscreenRow, fullscreenButton);
+    fullscreenRow.appendChild(fullscreenButton);
   } else {
-    headerActions.appendChild(actionRow);
+    headerActions.append(actionRow, fullscreenRow);
+    if (fullscreenButton) fullscreenRow.appendChild(fullscreenButton);
   }
 
   const toggleButton = document.createElement("button");
@@ -907,7 +911,6 @@ function addColumnPicker(columns) {
   toggleButton.setAttribute("aria-expanded", "false");
   toggleButton.setAttribute("aria-controls", "column-picker-menu");
   columnPickerToggleButton = toggleButton;
-  actionRow.insertBefore(toggleButton, fullscreenButton || null);
 
   const comparisonSelect = document.createElement("select");
   comparisonSelect.id = "comparison-game-filter";
@@ -926,7 +929,7 @@ function addColumnPicker(columns) {
   comparisonFilterSelect = comparisonSelect;
   comparisonSelect.disabled = !comparisonFilterField;
   if (!comparisonFilterField) comparisonSelect.title = "The database feed does not include a Comparison column.";
-  actionRow.insertBefore(comparisonSelect, fullscreenButton || null);
+  actionRow.append(comparisonSelect, toggleButton);
 
   comparisonSelect.addEventListener("change", function () {
     if (!comparisonFilterField) return;
