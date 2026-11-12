@@ -257,15 +257,30 @@ function textFormatter(cell) {
 
 function gameNameFormatter(cell) {
   const gameName = cell.getValue() == null ? "" : String(cell.getValue());
-  const note = String(cell.getRow().getData().note0 || "").trim();
-  if (!note) return makeTextElement(gameName);
+  const row = cell.getRow().getData();
+  const note = String(row.note0 || "").trim();
+  const name = document.createElement("span");
+  name.className = "game-name-card-trigger";
+  name.textContent = gameName;
+  name.setAttribute("role", "button");
+  name.setAttribute("tabindex", "0");
+  name.setAttribute("aria-label", "View game card for " + gameName);
+  name.title = "Click to view this game's card";
+  name.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    openGameCard(row);
+  });
+  name.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    openGameCard(row);
+  });
+  if (!note) return name;
 
   const wrapper = document.createElement("span");
   wrapper.className = "game-name-with-note";
-
-  const name = document.createElement("span");
-  name.className = "game-name-note-text";
-  name.textContent = gameName;
 
   const indicator = document.createElement("span");
   indicator.className = "game-note-indicator";
@@ -715,9 +730,6 @@ function normalizeResponse(payload) {
     };
 
     if (index === 0) {
-      definition.cellClick = function (_event, cell) {
-        openGameCard(cell.getRow().getData());
-      };
       definition.tooltip = function (_event, cell) {
         const note = String(cell.getRow().getData().note0 || "").trim();
         if (!note) return false;
@@ -917,15 +929,21 @@ function createSurpriseDialog() {
 
   const cardHeader = document.createElement("header");
   cardHeader.className = "surprise-card-header";
+  const heading = document.createElement("div");
+  heading.className = "surprise-game-heading";
   const title = document.createElement("h2");
   title.className = "surprise-game-title";
+  const note = document.createElement("p");
+  note.className = "surprise-game-note";
+  note.hidden = true;
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.className = "surprise-close";
   closeButton.setAttribute("aria-label", "Close surprise game card");
   closeButton.textContent = "×";
   closeButton.addEventListener("click", function () { dialog.close(); });
-  cardHeader.append(title, closeButton);
+  heading.append(title, note);
+  cardHeader.append(heading, closeButton);
 
   const body = document.createElement("div");
   body.className = "surprise-card-body";
@@ -957,6 +975,7 @@ function createSurpriseDialog() {
     nextButton: nextButton,
     body: body,
     title: title,
+    note: note,
     primary: primary,
     tags: tags,
     details: details,
@@ -1224,6 +1243,9 @@ function renderSurpriseGame(row) {
   const parts = createSurpriseDialog();
   parts.dialog.setAttribute("aria-label", cardBrowseMode === "list" ? "Game cards" : "Surprise game");
   parts.title.textContent = cleanGameValue(row.c0) || "Untitled game";
+  const gameNote = String(row.note0 || "").trim();
+  parts.note.textContent = gameNote;
+  parts.note.hidden = !gameNote;
   parts.primary.replaceChildren();
   parts.tags.replaceChildren();
   parts.details.replaceChildren();
