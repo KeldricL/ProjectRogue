@@ -4,6 +4,7 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbw_-kRO0YgDvL3n4VQ3xtepP4AZUzVcLoKX7uZc_CS5rMwfihPdWeNZ5QM2PloVx7Jt/exec";
 const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
 const GEMSTATION_TRIGGER = "##gemstation";
+const DEFINITIONS_PAGE_URL = "https://www.keldricgaming.com/p/definitions.html";
 const GEMSTATION_DATE_FIELD = "c46"; // AU, zero-based column index
 const GEMSTATION_VISIBLE_FIELDS = new Set(["c0", "c2", "c3", "c4", "c6", "c42", "c43", GEMSTATION_DATE_FIELD]);
 const COMPARISON_FILTER_OPTIONS = [
@@ -48,6 +49,8 @@ let surpriseDialogParts = null;
 let surpriseEligibleRows = [];
 let surpriseHistory = [];
 let surpriseHistoryIndex = -1;
+let surpriseDefinitions = new Map();
+let surpriseDefinitionsPromise = null;
 let syncColumnPickerCheckboxes = function () {};
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
@@ -783,6 +786,58 @@ function cleanGameValue(value) {
   return String(value == null ? "" : value).trim();
 }
 
+function normalizeDefinitionTerm(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function applySurpriseDefinitionTooltip(element, term) {
+  if (!element || !term) return;
+  element.dataset.definitionTerm = term;
+  const definition = surpriseDefinitions.get(normalizeDefinitionTerm(term));
+  if (!definition) return;
+  element.title = definition;
+  element.tabIndex = 0;
+  element.setAttribute("aria-label", term + ". " + definition);
+}
+
+function loadSurpriseDefinitions() {
+  if (surpriseDefinitionsPromise) return surpriseDefinitionsPromise;
+  surpriseDefinitionsPromise = fetch(DEFINITIONS_PAGE_URL, { credentials: "same-origin", cache: "no-cache" })
+    .then(function (response) {
+      if (!response.ok) throw new Error("Definitions page request failed");
+      return response.text();
+    })
+    .then(function (html) {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const root = doc.querySelector("#kg-definitions-page") || doc.body;
+      root.querySelectorAll("li").forEach(function (item) {
+        const termNode = item.querySelector("strong, b");
+        if (!termNode) return;
+        const term = termNode.textContent.replace(/\s+/g, " ").trim();
+        const fullText = item.textContent.replace(/\s+/g, " ").trim();
+        const termPosition = fullText.toLocaleLowerCase().indexOf(term.toLocaleLowerCase());
+        if (!term || termPosition < 0) return;
+        const definition = fullText.slice(termPosition + term.length).replace(/^\s*[—–-]\s*/, "").trim();
+        if (!definition) return;
+        const key = normalizeDefinitionTerm(term);
+        if (key && !surpriseDefinitions.has(key)) surpriseDefinitions.set(key, definition);
+      });
+      document.querySelectorAll("[data-definition-term]").forEach(function (element) {
+        applySurpriseDefinitionTooltip(element, element.dataset.definitionTerm);
+      });
+    })
+    .catch(function () {
+      surpriseDefinitionsPromise = null;
+    });
+  return surpriseDefinitionsPromise;
+}
+
 function isMeaningfulGameValue(value) {
   const text = cleanGameValue(value);
   return Boolean(text) && !NON_DATA_VALUES.has(text.toLocaleLowerCase());
@@ -942,6 +997,7 @@ function appendSurpriseTagGroup(parent, fieldIndex, value) {
     const chip = document.createElement("span");
     chip.className = "surprise-tag";
     chip.textContent = tagText;
+    applySurpriseDefinitionTooltip(chip, tagText);
     chipList.appendChild(chip);
   });
   if (!chipList.childElementCount) return;
@@ -998,6 +1054,7 @@ function appendSurpriseDetails(parent, row, excludedFields) {
       const chip = document.createElement("span");
       chip.className = "surprise-feature-chip";
       chip.textContent = featureTitle;
+        applySurpriseDefinitionTooltip(chip, featureTitle);
       featureList.appendChild(chip);
     });
     featureSection.append(featureHeading, featureList);
@@ -1190,6 +1247,7 @@ function renderSurpriseGame(row) {
 
 function openSurpriseMe() {
   if (!table) return;
+  loadSurpriseDefinitions();
   const activeRows = table.getData("active");
   surpriseEligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
   if (!surpriseEligibleRows.length) {

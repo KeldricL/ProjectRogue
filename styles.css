@@ -287,6 +287,8 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-tag-heading, .surprise-section-heading { margin: 0; color: #bac3ce; font-size: .86rem; font-weight: 700; }
 .surprise-tag-list { display: flex; flex-wrap: wrap; gap: 7px; }
 .surprise-tag { display: inline-flex; align-items: center; min-height: 29px; padding: 4px 11px; border: 1px solid #3d6570; border-radius: 999px; background: #243d48; color: #a9e4f0; font-size: .84rem; font-weight: 650; line-height: 1.2; }
+.surprise-tag[title], .surprise-feature-chip[title] { cursor: help; }
+.surprise-tag:focus-visible, .surprise-feature-chip:focus-visible { outline: 2px solid #d5ffe0; outline-offset: 2px; }
 .surprise-details { margin-top: 8px; }
 .surprise-section-heading { margin-bottom: 9px; color: #b8efc3; font-size: .98rem; }
 .surprise-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 7px 9px; }
