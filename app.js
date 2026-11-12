@@ -715,6 +715,9 @@ function normalizeResponse(payload) {
     };
 
     if (index === 0) {
+      definition.cellClick = function (_event, cell) {
+        openGameCard(cell.getRow().getData());
+      };
       definition.tooltip = function (_event, cell) {
         const note = String(cell.getRow().getData().note0 || "").trim();
         if (!note) return false;
@@ -1219,7 +1222,7 @@ function appendSurpriseLinks(parent, row) {
 
 function renderSurpriseGame(row) {
   const parts = createSurpriseDialog();
-  parts.dialog.setAttribute("aria-label", cardBrowseMode === "filtered" ? "Filtered game cards" : "Surprise game");
+  parts.dialog.setAttribute("aria-label", cardBrowseMode === "list" ? "Game cards" : "Surprise game");
   parts.title.textContent = cleanGameValue(row.c0) || "Untitled game";
   parts.primary.replaceChildren();
   parts.tags.replaceChildren();
@@ -1259,7 +1262,7 @@ function renderSurpriseGame(row) {
   if (!parts.details.childElementCount) parts.details.hidden = true;
   else parts.details.hidden = false;
 
-  if (cardBrowseMode === "filtered") {
+  if (cardBrowseMode === "list") {
     parts.previousButton.hidden = filteredCardIndex <= 0;
     parts.nextButton.hidden = filteredCardIndex >= filteredCardRows.length - 1;
     parts.previousButton.title = "Previous matching game";
@@ -1301,6 +1304,28 @@ function openSurpriseMe() {
   }
 }
 
+function openGameCard(row) {
+  if (!table || !row) return;
+  try {
+    try { loadSurpriseDefinitions(); } catch (_error) {}
+    filteredCardRows = table.getData("active");
+    filteredCardIndex = filteredCardRows.findIndex(function (candidate) {
+      return candidate === row;
+    });
+    if (filteredCardIndex < 0) {
+      const gameName = cleanGameValue(row.c0);
+      filteredCardIndex = filteredCardRows.findIndex(function (candidate) {
+        return cleanGameValue(candidate.c0) === gameName;
+      });
+    }
+    cardBrowseMode = "list";
+    renderSurpriseGame(row);
+  } catch (error) {
+    console.error("Game card could not open:", error);
+    setStatus("The game card could not open. Please try again.", true);
+  }
+}
+
 function openFilteredCards() {
   if (!table || !hasActiveUserFilters()) return;
   const activeRows = table.getData("active");
@@ -1309,14 +1334,14 @@ function openFilteredCards() {
     return;
   }
   try { loadSurpriseDefinitions(); } catch (_error) {}
-  cardBrowseMode = "filtered";
+  cardBrowseMode = "list";
   filteredCardRows = activeRows;
   filteredCardIndex = 0;
   renderSurpriseGame(filteredCardRows[filteredCardIndex]);
 }
 
 function moveSurpriseHistory(direction) {
-  if (cardBrowseMode === "filtered") {
+  if (cardBrowseMode === "list") {
     const nextIndex = filteredCardIndex + direction;
     if (nextIndex < 0 || nextIndex >= filteredCardRows.length) return;
     filteredCardIndex = nextIndex;
