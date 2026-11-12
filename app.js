@@ -993,10 +993,15 @@ function appendSurpriseTagGroup(parent, fieldIndex, value) {
 function appendSurpriseDetails(parent, row, excludedFields) {
   const detailFields = [];
   const yesFeatures = [];
-  for (let index = 6; index <= 38; index += 1) {
+  const yesOnlyFeatureFields = new Set([39, 40, 41]); // AN, AO, AP
+  for (let index = 6; index <= 41; index += 1) {
     const field = "c" + index;
     const value = cleanGameValue(row[field]);
     if (excludedFields.has(index) || !isMeaningfulGameValue(value)) continue;
+    if (yesOnlyFeatureFields.has(index)) {
+      if (/^y$/i.test(value)) yesFeatures.push(databaseHeaders[index]);
+      continue;
+    }
     if (/^(y|yes)$/i.test(value)) {
       yesFeatures.push(databaseHeaders[index]);
       continue;
