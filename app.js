@@ -1231,6 +1231,7 @@ function renderSurpriseGame(row) {
 }
 
 function openSurpriseMe() {
+  let stage = "checking the loaded database";
   try {
     if (!table) return;
     try { loadSurpriseDefinitions(); } catch (_error) {}
@@ -1243,10 +1244,11 @@ function openSurpriseMe() {
     const selected = surpriseEligibleRows[Math.floor(Math.random() * surpriseEligibleRows.length)];
     surpriseHistory = [selected];
     surpriseHistoryIndex = 0;
+    stage = "building the game card";
     renderSurpriseGame(selected);
   } catch (error) {
     console.error("Surprise Me could not open:", error);
-    setStatus("Surprise Me could not open: " + error.message, true);
+    setStatus("Surprise Me failed while " + stage + ": " + error.message, true);
   }
 }
 
