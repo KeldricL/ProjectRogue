@@ -1248,7 +1248,7 @@ function appendSurpriseLinks(parent, row) {
 
 function renderSurpriseGame(row) {
   const parts = createSurpriseDialog();
-  parts.dialog.setAttribute("aria-label", cardBrowseMode === "list" ? "Game cards" : "Surprise game");
+  parts.dialog.setAttribute("aria-label", cardBrowseMode === "newest" ? "Newest submitted game cards" : (cardBrowseMode === "list" ? "Game cards" : "Surprise game"));
   parts.title.textContent = cleanGameValue(row.c0) || "Untitled game";
   const gameNote = String(row.note0 || "").trim();
   parts.note.textContent = gameNote;
@@ -1291,7 +1291,14 @@ function renderSurpriseGame(row) {
   if (!parts.details.childElementCount) parts.details.hidden = true;
   else parts.details.hidden = false;
 
-  if (cardBrowseMode === "list") {
+  if (cardBrowseMode === "newest") {
+    parts.previousButton.hidden = filteredCardIndex >= filteredCardRows.length - 1;
+    parts.nextButton.hidden = filteredCardIndex <= 0;
+    parts.previousButton.title = "Older submitted game";
+    parts.nextButton.title = "Newer submitted game";
+    parts.previousButton.setAttribute("aria-label", "Older submitted game");
+    parts.nextButton.setAttribute("aria-label", "Newer submitted game");
+  } else if (cardBrowseMode === "list") {
     parts.previousButton.hidden = filteredCardIndex <= 0;
     parts.nextButton.hidden = filteredCardIndex >= filteredCardRows.length - 1;
     parts.previousButton.title = "Previous matching game";
@@ -1333,6 +1340,59 @@ function openSurpriseMe() {
   }
 }
 
+function parseSubmissionTimestamp(value) {
+  const text = cleanGameValue(value);
+  if (!text) return NaN;
+
+  const usDate = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?$/i);
+  if (usDate) {
+    const month = Number(usDate[1]);
+    const day = Number(usDate[2]);
+    const year = Number(usDate[3]);
+    let hour = Number(usDate[4] || 0);
+    const minute = Number(usDate[5] || 0);
+    const second = Number(usDate[6] || 0);
+    const meridiem = String(usDate[7] || "").toLocaleUpperCase();
+    if (meridiem === "PM" && hour < 12) hour += 12;
+    if (meridiem === "AM" && hour === 12) hour = 0;
+    const parsed = new Date(year, month - 1, day, hour, minute, second);
+    if (parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day) {
+      return parsed.getTime();
+    }
+    return NaN;
+  }
+
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp) ? timestamp : NaN;
+}
+
+function openNewestGame() {
+  if (!table) return;
+  if (!table.getColumn(GEMSTATION_DATE_FIELD)) {
+    setStatus("Newest Game needs the database feed to include the hidden AU submission-date column.", true);
+    return;
+  }
+
+  const datedRows = table.getData().map(function (row) {
+    return { row: row, timestamp: parseSubmissionTimestamp(row[GEMSTATION_DATE_FIELD]) };
+  }).filter(function (item) {
+    return Number.isFinite(item.timestamp);
+  }).sort(function (a, b) {
+    return b.timestamp - a.timestamp;
+  });
+
+  if (!datedRows.length) {
+    setStatus("No games with a valid AU submission date are available.", true);
+    return;
+  }
+
+  try { loadSurpriseDefinitions(); } catch (_error) {}
+  cardBrowseMode = "newest";
+  filteredCardRows = datedRows.map(function (item) { return item.row; });
+  filteredCardIndex = 0;
+  renderSurpriseGame(filteredCardRows[filteredCardIndex]);
+}
+
 function openGameCard(row) {
   if (!table || !row) return;
   try {
@@ -1370,6 +1430,14 @@ function openFilteredCards() {
 }
 
 function moveSurpriseHistory(direction) {
+  if (cardBrowseMode === "newest") {
+    const nextIndex = filteredCardIndex + (direction < 0 ? 1 : -1);
+    if (nextIndex < 0 || nextIndex >= filteredCardRows.length) return;
+    filteredCardIndex = nextIndex;
+    renderSurpriseGame(filteredCardRows[filteredCardIndex]);
+    return;
+  }
+
   if (cardBrowseMode === "list") {
     const nextIndex = filteredCardIndex + direction;
     if (nextIndex < 0 || nextIndex >= filteredCardRows.length) return;
@@ -1538,14 +1606,7 @@ function addColumnPicker(columns) {
   actionRow.className = "header-button-row";
   const surpriseControlsRow = document.createElement("div");
   surpriseControlsRow.className = "header-button-row surprise-controls-row";
-  if (fullscreenButton && fullscreenButton.parentElement === headerActions) {
-    headerActions.insertBefore(actionRow, fullscreenButton);
-    headerActions.insertBefore(surpriseControlsRow, fullscreenButton);
-    surpriseControlsRow.appendChild(fullscreenButton);
-  } else {
-    headerActions.append(actionRow, surpriseControlsRow);
-    if (fullscreenButton) surpriseControlsRow.appendChild(fullscreenButton);
-  }
+  headerActions.append(actionRow, surpriseControlsRow);
 
   const toggleButton = document.createElement("button");
   toggleButton.id = "column-picker-toggle";
@@ -1561,6 +1622,13 @@ function addColumnPicker(columns) {
   surpriseButton.textContent = "Surprise me";
   surpriseButton.setAttribute("aria-label", "Show a random game matching the current filters");
   surpriseButton.addEventListener("click", openSurpriseMe);
+
+  const newestButton = document.createElement("button");
+  newestButton.id = "newest-game-button";
+  newestButton.type = "button";
+  newestButton.textContent = "NEWEST GAME";
+  newestButton.setAttribute("aria-label", "Show the most recently submitted game and browse older submissions");
+  newestButton.addEventListener("click", openNewestGame);
 
   if (!filteredCardsButton) filteredCardsButton = document.getElementById("view-filtered-cards");
   if (filteredCardsButton && filteredCardsButton.dataset.clickBound !== "true") {
@@ -1586,7 +1654,7 @@ function addColumnPicker(columns) {
   comparisonSelect.disabled = !comparisonFilterField;
   if (!comparisonFilterField) comparisonSelect.title = "The database feed does not include a Comparison column.";
   actionRow.append(comparisonSelect, toggleButton);
-  surpriseControlsRow.append(surpriseButton, fullscreenButton);
+  surpriseControlsRow.append(surpriseButton, newestButton);
 
   comparisonSelect.addEventListener("change", function () {
     if (!comparisonFilterField) return;
