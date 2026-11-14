@@ -7,6 +7,10 @@ const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
 const GEMSTATION_TRIGGER = "##gemstation";
 const GEMSTATION_DATE_FIELD = "c46"; // AU, zero-based column index
 const GEMSTATION_VISIBLE_FIELDS = new Set(["c0", "c2", "c3", "c4", "c6", "c42", "c43", GEMSTATION_DATE_FIELD]);
+const UNORDERED_FILTER_GROUPS = [
+  { name: "Game Type", fields: ["c6", "c7", "c8"] }, // G-I
+  { name: "Theme", fields: ["c10", "c11"] }, // K-L
+];
 const COMPARISON_FILTER_OPTIONS = [
   { abbreviation: "Atomicrops-like", phrase: "Atomicrops" },
   { abbreviation: "Brotato-Like", phrase: "Brotato" },
@@ -93,13 +97,9 @@ function setStatus(message, isError) {
 function updateDuplicateFilterWarning() {
   if (!duplicateFilterWarningElement) return;
 
-  const groups = [
-    { name: "Game Type", fields: ["c6", "c7", "c8"] }, // G-I
-    { name: "Theme", fields: ["c10", "c11"] }, // K-L
-  ];
   const warnings = [];
 
-  groups.forEach(function (group) {
+  UNORDERED_FILTER_GROUPS.forEach(function (group) {
     const selectedByValue = new Map();
     const duplicates = new Set();
 
@@ -432,15 +432,26 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
   return wrapper;
 }
 
-function combinedColumnHeaderFilter(filterValue, cellValue, rowData) {
+function combinedColumnHeaderFilter(filterValue, cellValue, rowData, field) {
   if (!filterValue) return true;
 
   const value = cellValue == null ? "" : String(cellValue);
   const query = String(filterValue.query || "").trim().toLocaleLowerCase();
   const selectedValues = Array.isArray(filterValue.selectedValues) ? filterValue.selectedValues : [];
+  const group = UNORDERED_FILTER_GROUPS.find(function (candidate) {
+    return candidate.fields.includes(field);
+  });
+  const valuesToSearch = group
+    ? group.fields.map(function (groupField) { return String(rowData[groupField] == null ? "" : rowData[groupField]); })
+    : [value];
 
-  if (query && !value.toLocaleLowerCase().includes(query)) return false;
-  if (selectedValues.length && !selectedValues.includes(value)) return false;
+  if (query && !valuesToSearch.some(function (candidate) { return candidate.toLocaleLowerCase().includes(query); })) return false;
+  if (selectedValues.length && !selectedValues.some(function (selected) {
+    const expected = String(selected == null ? "" : selected).trim().toLocaleLowerCase();
+    return valuesToSearch.some(function (candidate) {
+      return candidate.trim().toLocaleLowerCase() === expected;
+    });
+  })) return false;
   if (filterValue.notesOnly && !String(rowData && rowData.note0 || "").trim()) return false;
   return true;
 }
@@ -756,7 +767,9 @@ function normalizeResponse(payload) {
       field: "c" + index,
       visible: index === 0 || (index !== 46 && !hiddenColumnFields.has("c" + index)),
       headerFilter: createColumnHeaderFilter,
-      headerFilterFunc: combinedColumnHeaderFilter,
+      headerFilterFunc: function (filterValue, cellValue, rowData) {
+        return combinedColumnHeaderFilter(filterValue, cellValue, rowData, "c" + index);
+      },
       headerFilterLiveFilter: false,
       headerSort: true,
       sorter: "string",
