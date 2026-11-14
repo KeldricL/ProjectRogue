@@ -313,6 +313,8 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-links { margin-top: 20px; padding-top: 14px; border-top: 1px solid #41494d; }
 .surprise-submit-missing { display: flex; width: fit-content; max-width: 100%; min-height: 38px; margin: 22px auto 0; padding: 8px 14px; align-items: center; justify-content: center; border: 1px solid #83cf9a; border-radius: 8px; background: #b8efc3; color: #23372a; font-weight: 700; line-height: 1.3; text-align: center; text-decoration: none; }
 .surprise-submit-missing:hover { border-color: #a4e8b2; background: #d4f7da; color: #17201d; }
+dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing { border-color: #83cf9a !important; background-color: #b8efc3 !important; color: #23372a !important; }
+dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing:hover { border-color: #a4e8b2 !important; background-color: #d4f7da !important; color: #17201d !important; }
 .surprise-link-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 10px; }
 .surprise-link-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; width: 180px; min-width: 0; }
 .surprise-game-link { display: inline-flex; justify-self: start; align-items: center; max-width: 100%; min-height: 36px; margin: 0; padding: 7px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
