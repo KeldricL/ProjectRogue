@@ -311,6 +311,8 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-feature-heading { margin: 0 0 7px; color: #b8efc3; font-size: .84rem; font-weight: 750; }
 .surprise-feature-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 7px; }
 .surprise-links { margin-top: 20px; padding-top: 14px; border-top: 1px solid #41494d; }
+.surprise-submit-missing { display: flex; width: fit-content; max-width: 100%; min-height: 38px; margin: 14px auto 0; padding: 8px 14px; align-items: center; justify-content: center; border: 1px solid #4b8760; border-radius: 8px; background: #23372a; color: #b8efc3; font-weight: 700; line-height: 1.3; text-align: center; text-decoration: none; }
+.surprise-submit-missing:hover { border-color: #83cf9a; background: #304237; color: #e4ffea; }
 .surprise-link-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 10px; }
 .surprise-link-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; width: 180px; min-width: 0; }
 .surprise-game-link { display: inline-flex; justify-self: start; align-items: center; max-width: 100%; min-height: 36px; margin: 0; padding: 7px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
@@ -377,6 +379,7 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .header-button-row.surprise-controls-row { flex-direction: row; align-items: stretch; }
   .header-button-row.surprise-controls-row button { width: auto; flex: 1 1 0; }
   .comparison-filter-select { width: 100%; max-width: none; }
+  .comparison-filter-select { text-align: center; text-align-last: center; }
   .surprise-dialog { width: calc(100vw - 16px); max-height: 94vh; max-height: 94dvh; }
   .surprise-dialog-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "card card" "previous next"; gap: 9px 12px; }
   .surprise-card { grid-area: card; }
@@ -435,6 +438,7 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .surprise-feature-heading { margin-bottom: 5px; font-size: .77rem; }
   .surprise-feature-chip { min-height: 29px; padding: 5px 8px; font-size: .75rem; }
   .surprise-links { margin-top: 12px; padding-top: 9px; }
+  .surprise-submit-missing { min-height: 34px; margin-top: 9px; padding: 6px 10px; font-size: .78rem; }
   .surprise-link-card { gap: 5px; }
   .surprise-game-link { min-height: 30px; padding: 5px 8px; font-size: .8rem; }
   .surprise-thumbnail-link { max-height: 86px; }

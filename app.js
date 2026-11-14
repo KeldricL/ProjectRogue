@@ -2,6 +2,7 @@
 
 // This endpoint reads the Master worksheet and returns JSONP for the GitHub Pages site.
 const API_URL = "https://script.google.com/macros/s/AKfycbw_-kRO0YgDvL3n4VQ3xtepP4AZUzVcLoKX7uZc_CS5rMwfihPdWeNZ5QM2PloVx7Jt/exec";
+const SUBMISSION_FORM_URL = "https://forms.gle/Gk2MqGEVbinivR898";
 const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
 const GEMSTATION_TRIGGER = "##gemstation";
 const GEMSTATION_DATE_FIELD = "c46"; // AU, zero-based column index
@@ -959,7 +960,13 @@ function createSurpriseDialog() {
   const links = document.createElement("section");
   links.className = "surprise-links";
   links.setAttribute("aria-label", "Game links and thumbnails");
-  body.append(primary, tags, details, links);
+  const submitMissingDataLink = document.createElement("a");
+  submitMissingDataLink.className = "surprise-submit-missing";
+  submitMissingDataLink.href = SUBMISSION_FORM_URL;
+  submitMissingDataLink.target = "_blank";
+  submitMissingDataLink.rel = "noopener noreferrer";
+  submitMissingDataLink.textContent = "Submit missing data for this game!";
+  body.append(primary, tags, details, links, submitMissingDataLink);
   card.append(cardHeader, body);
 
   layout.append(previousButton, card, nextButton);
