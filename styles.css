@@ -286,7 +286,7 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-close { flex: 0 0 auto; width: 38px; min-height: 38px; padding: 0; font-size: 1.6rem; line-height: 1; }
 .surprise-card-body { min-height: 0; overflow: auto; padding: 18px 20px 22px; overscroll-behavior: contain; }
 .surprise-primary-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 16px; }
-.surprise-primary-fact { min-width: 0; padding: 10px 12px; border: 1px solid #3e4a4c; border-radius: 8px; background: #252d30; }
+.surprise-primary-fact { min-width: 0; padding: 7px 12px; border: 1px solid #3e4a4c; border-radius: 8px; background: #252d30; }
 .surprise-field-label, .surprise-detail-label { display: block; margin-bottom: 4px; color: #aebbb7; font-size: .77rem; font-weight: 700; letter-spacing: .025em; }
 .surprise-field-value { display: block; color: #f1f5f3; font-weight: 650; overflow-wrap: anywhere; }
 .surprise-tags { margin: 4px 0 18px; }
@@ -307,7 +307,7 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-detail-item .surprise-detail-label { display: inline; flex: 0 1 auto; margin: 0; }
 .surprise-detail-separator { color: #83cf9a; font-weight: 800; }
 .surprise-detail-value { display: inline; min-width: 0; color: #e8edf5; overflow-wrap: anywhere; }
-.surprise-feature-chip { display: inline-flex; justify-self: start; width: fit-content; max-width: 100%; align-items: center; min-height: 36px; padding: 7px 11px; border: 1px solid #3f7650; border-radius: 999px; background: #23372a; color: #b8efc3; font-size: .84rem; font-weight: 650; line-height: 1.25; }
+.surprise-feature-chip { display: inline-flex; justify-self: start; width: fit-content; max-width: 100%; align-items: center; min-height: 30px; padding: 4px 11px; border: 1px solid #3f7650; border-radius: 999px; background: #23372a; color: #b8efc3; font-size: .84rem; font-weight: 650; line-height: 1.25; }
 .surprise-feature-section { margin-top: 12px; }
 .surprise-feature-heading { margin: 0 0 7px; color: #b8efc3; font-size: .84rem; font-weight: 750; }
 .surprise-feature-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 7px; }
@@ -318,7 +318,7 @@ dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing { border-
 dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing:hover { border-color: #a4e8b2 !important; background-color: #d4f7da !important; color: #17201d !important; }
 .surprise-link-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 10px; }
 .surprise-link-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; width: 180px; min-width: 0; }
-.surprise-game-link { display: inline-flex; justify-self: start; align-items: center; max-width: 100%; min-height: 36px; margin: 0; padding: 7px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
+.surprise-game-link { display: inline-flex; justify-self: start; align-items: center; max-width: 100%; min-height: 30px; margin: 0; padding: 4px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
 .surprise-game-link:hover { border-color: #83cf9a; background: #304237; }
 .surprise-thumbnail-link { display: flex; width: 100%; height: 102px; margin: 0; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
 .surprise-thumbnail-link img { display: block; width: 100%; height: 100%; padding: 2px; object-fit: contain; }
@@ -422,7 +422,7 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .surprise-close { width: 34px; min-height: 34px; font-size: 1.4rem; }
   .surprise-card-body { padding: 9px 10px 12px; }
   .surprise-primary-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 9px; }
-  .surprise-primary-fact { padding: 6px 8px; border-radius: 6px; }
+  .surprise-primary-fact { padding: 4px 8px; border-radius: 6px; }
   .surprise-field-label, .surprise-detail-label { margin-bottom: 2px; font-size: .69rem; }
   .surprise-field-value { font-size: .84rem; line-height: 1.25; }
   .surprise-tags { margin: 2px 0 10px; }
@@ -439,10 +439,10 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .surprise-detail-item .surprise-detail-label { font-size: .67rem; }
   .surprise-feature-section { margin-top: 8px; }
   .surprise-feature-heading { margin-bottom: 5px; font-size: .77rem; }
-  .surprise-feature-chip { min-height: 29px; padding: 5px 8px; font-size: .75rem; }
+  .surprise-feature-chip { min-height: 25px; padding: 3px 8px; font-size: .75rem; }
   .surprise-links { margin-top: 12px; padding-top: 9px; }
   .surprise-submit-missing { min-height: 34px; margin-top: 16px; padding: 6px 10px; font-size: .78rem; }
   .surprise-link-card { gap: 5px; }
-  .surprise-game-link { min-height: 30px; padding: 5px 8px; font-size: .8rem; }
+  .surprise-game-link { min-height: 26px; padding: 3px 8px; font-size: .8rem; }
   .surprise-thumbnail-link { max-height: 86px; }
 }
