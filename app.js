@@ -25,6 +25,7 @@ const COMPARISON_FILTER_OPTIONS = [
   { abbreviation: "Ziggurat-Like", phrase: "Ziggurat" },
 ];
 const statusElement = document.getElementById("status");
+const duplicateFilterWarningElement = document.getElementById("duplicate-filter-warning");
 const countElement = document.getElementById("record-count");
 const searchElement = document.getElementById("global-search");
 const clearButton = document.getElementById("clear-filters");
@@ -87,6 +88,43 @@ function saveHiddenColumns() {
 function setStatus(message, isError) {
   statusElement.textContent = message;
   statusElement.classList.toggle("error", Boolean(isError));
+}
+
+function updateDuplicateFilterWarning() {
+  if (!duplicateFilterWarningElement) return;
+
+  const groups = [
+    { name: "Game Type", fields: ["c6", "c7", "c8"] }, // G-I
+    { name: "Theme", fields: ["c10", "c11"] }, // K-L
+  ];
+  const warnings = [];
+
+  groups.forEach(function (group) {
+    const selectedByValue = new Map();
+    const duplicates = new Set();
+
+    group.fields.forEach(function (field) {
+      const state = columnFilterStates.get(field);
+      if (!state || !Array.isArray(state.selectedValues)) return;
+
+      state.selectedValues.forEach(function (value) {
+        const label = String(value == null ? "" : value).trim();
+        if (!label) return;
+        const key = label.toLocaleLowerCase();
+        if (selectedByValue.has(key)) duplicates.add(label);
+        else selectedByValue.set(key, field);
+      });
+    });
+
+    if (duplicates.size) {
+      warnings.push("Duplicate " + group.name + " choice" + (duplicates.size > 1 ? "s" : "") + ": " + Array.from(duplicates).join(", ") + ".");
+    }
+  });
+
+  duplicateFilterWarningElement.textContent = warnings.length
+    ? warnings.join(" ") + " Deselect duplicate answers."
+    : "";
+  duplicateFilterWarningElement.hidden = warnings.length === 0;
 }
 
 function sendUsageEvent(eventName, parameters) {
@@ -376,6 +414,7 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
       notesOnly: state.notesOnly,
     });
     updateChoicesButton(choicesButton, state, field);
+    updateDuplicateFilterWarning();
     updateFilteredCardsButton();
     scheduleSearchUsage("column", field, title, function () { return input.value; });
   }
@@ -637,6 +676,7 @@ function commitActiveValueMenu() {
     notesOnly: state.notesOnly,
   });
   updateChoicesButton(activeValueMenu.button, state, activeValueMenu.title);
+  updateDuplicateFilterWarning();
   updateFilteredCardsButton();
   scheduleColumnFilterUsage(activeValueMenu.field, activeValueMenu.title, state);
 }
@@ -685,6 +725,7 @@ function clearColumnFilters() {
   });
   closeColumnValueMenu(false);
   if (comparisonFilterSelect) comparisonFilterSelect.value = "";
+  updateDuplicateFilterWarning();
   updateFilteredCardsButton();
 }
 

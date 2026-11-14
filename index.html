@@ -16,7 +16,7 @@
     });
   </script>
   <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.5.0/dist/css/tabulator.min.css">
-  <link rel="stylesheet" href="styles.css?v=20261114-card-vertical-padding-1">
+  <link rel="stylesheet" href="styles.css?v=20261114-duplicate-filter-warning-1">
 </head>
 <body>
   <main class="page-shell">
@@ -38,6 +38,7 @@
     <div class="database-status-row">
       <button id="view-filtered-cards" class="view-filtered-cards" type="button" hidden>View these game cards</button>
       <div id="status" class="status" role="status" aria-live="polite">Loading game database…</div>
+      <div id="duplicate-filter-warning" class="duplicate-filter-warning" role="alert" hidden></div>
       <button id="retry-database" class="retry-button" type="button" hidden>Reload database</button>
     </div>
     <section class="table-frame" aria-label="Game database table">
@@ -49,7 +50,7 @@
     </footer>
   </main>
 
-  <script type="module" src="tabulator-slim-loader.js?v=20261114-card-vertical-padding-1"></script>
+  <script type="module" src="tabulator-slim-loader.js?v=20261114-duplicate-filter-warning-1"></script>
 </body>
 </html>
 

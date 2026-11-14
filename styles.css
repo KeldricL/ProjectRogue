@@ -28,6 +28,7 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .database-status-row { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px 12px; min-height: 42px; margin-bottom: 8px; }
 .status { min-height: 24px; margin: 0; color: #b6c0c7; font-size: .9rem; }
 .status.error { color: #ff8d8d; }
+.duplicate-filter-warning { flex: 1 0 100%; margin: 0; color: #ff8d8d; font-size: .9rem; font-weight: 650; }
 .view-filtered-cards { min-height: 34px; padding: 5px 11px; border-color: #4c8760; color: #b9f0c5; white-space: nowrap; }
 .view-filtered-cards[hidden] { display: none; }
 .retry-button { min-height: 34px; padding: 5px 11px; border-color: #6dc583; color: #b9f0c5; }
