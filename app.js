@@ -5,7 +5,8 @@ const API_URL = "https://script.google.com/macros/s/AKfycbw_-kRO0YgDvL3n4VQ3xtep
 const SUBMISSION_FORM_URL = "https://forms.gle/Gk2MqGEVbinivR898";
 const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
 const GEMSTATION_TRIGGER = "##gemstation";
-const GEMSTATION_DATE_FIELD = "c46"; // AU, zero-based column index
+const GEMSTATION_DATE_FIELD = "c48"; // AW, zero-based column index
+const FREE_TO_PLAY_FIELD = "c42"; // AQ, zero-based column index
 const GEMSTATION_VISIBLE_FIELDS = new Set(["c0", "c2", "c3", "c4", "c6", "c42", "c43", GEMSTATION_DATE_FIELD]);
 const UNORDERED_FILTER_GROUPS = [
   { name: "Game Type", fields: ["c6", "c7", "c8"] }, // G-I
@@ -48,11 +49,13 @@ let databaseControlsBound = false;
 let databaseRows = [];
 let hiddenColumnFields = loadHiddenColumns();
 let gemstationModeActive = false;
+let freeGamesModeActive = false;
 let columnPickerToggleButton = null;
 let columnPickerMenu = null;
 let comparisonFilterSelect = null;
 let comparisonFilterField = "";
 let filteredCardsButton = document.getElementById("view-filtered-cards");
+let freeGamesButton = null;
 let surpriseDialogParts = null;
 let cardBrowseMode = "surprise";
 let filteredCardRows = [];
@@ -466,7 +469,10 @@ function getColumnValueOptions(field) {
   return Array.from(counts.entries()).map(function (entry) {
     return { value: entry[0], count: entry[1] };
   }).sort(function (a, b) {
-    return (a.value || "").localeCompare(b.value || "", undefined, { sensitivity: "base" });
+    const aIsBlank = !String(a.value || "").trim();
+    const bIsBlank = !String(b.value || "").trim();
+    if (aIsBlank !== bIsBlank) return aIsBlank ? 1 : -1;
+    return String(a.value || "").localeCompare(String(b.value || ""), undefined, { sensitivity: "base" });
   });
 }
 
@@ -765,7 +771,7 @@ function normalizeResponse(payload) {
     const definition = {
       title: databaseHeaders[index],
       field: "c" + index,
-      visible: index === 0 || (index !== 46 && !hiddenColumnFields.has("c" + index)),
+      visible: index === 0 || (index !== 48 && !hiddenColumnFields.has("c" + index)),
       headerFilter: createColumnHeaderFilter,
       headerFilterFunc: function (filterValue, cellValue, rowData) {
         return combinedColumnHeaderFilter(filterValue, cellValue, rowData, "c" + index);
@@ -813,7 +819,7 @@ function normalizeResponse(payload) {
       };
     }
 
-    if (index === 46) {
+    if (index === 48) {
       definition.sorter = function (a, b) {
         const aText = a == null ? "" : String(a).trim();
         const bText = b == null ? "" : String(b).trim();
@@ -1423,7 +1429,7 @@ function parseSubmissionTimestamp(value) {
 function openNewestGame() {
   if (!table) return;
   if (!table.getColumn(GEMSTATION_DATE_FIELD)) {
-    setStatus("Newest Game needs the database feed to include the hidden AU submission-date column.", true);
+    setStatus("Newest Games needs the database feed to include the hidden AW submission-date column.", true);
     return;
   }
 
@@ -1436,7 +1442,7 @@ function openNewestGame() {
   });
 
   if (!datedRows.length) {
-    setStatus("No games with a valid AU submission date are available.", true);
+    setStatus("No games with a valid AW submission date are available.", true);
     return;
   }
 
@@ -1524,6 +1530,7 @@ function moveSurpriseHistory(direction) {
 }
 
 function globalSearchFilter(rowData) {
+  if (freeGamesModeActive && String(rowData[FREE_TO_PLAY_FIELD] || "").trim().toLocaleUpperCase() !== "Y") return false;
   const query = searchElement.value.trim().toLocaleLowerCase();
   if (!query) return true;
 
@@ -1548,16 +1555,16 @@ function applyGlobalSearch() {
   }
   if (gemstationModeActive) leaveGemstationMode();
 
-  if (searchElement.value.trim() === "") {
-    table.clearFilter(); // Keeps the individual column header filters.
-  } else {
+  if (freeGamesModeActive || searchElement.value.trim() !== "") {
     table.setFilter(globalSearchFilter);
+  } else {
+    table.clearFilter(); // Keeps the individual column header filters.
   }
   updateFilteredCardsButton();
 }
 
 function hasActiveUserFilters() {
-  if (gemstationModeActive || searchElement.value.trim()) return true;
+  if (gemstationModeActive || freeGamesModeActive || searchElement.value.trim()) return true;
   return Array.from(columnFilterStates.values()).some(function (state) {
     return Boolean(
       String(state.query || "").trim() ||
@@ -1575,11 +1582,13 @@ function updateFilteredCardsButton() {
 function enterGemstationMode() {
   if (!table || gemstationModeActive) return;
   if (!table.getColumn(GEMSTATION_DATE_FIELD)) {
-    setStatus("The Gemstation view needs the database feed to include Master columns through AU.", true);
+    setStatus("The Gemstation view needs the database feed to include Master columns through AW.", true);
     return;
   }
 
   gemstationModeActive = true;
+  freeGamesModeActive = false;
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
   clearColumnFilters();
   table.clearFilter(true);
   table.getColumns().forEach(function (column) {
@@ -1617,11 +1626,33 @@ function leaveGemstationMode() {
   syncColumnPickerCheckboxes();
 
   const query = searchElement.value.trim();
-  if (query) table.setFilter(globalSearchFilter);
+  if (query || freeGamesModeActive) table.setFilter(globalSearchFilter);
   else table.clearFilter();
   updateFilteredCardsButton();
   const count = Number(countElement.textContent.replace(/[^0-9]/g, ""));
   setStatus("Loaded " + (Number.isFinite(count) ? count.toLocaleString() : databaseRows.length.toLocaleString()) + " games from the Master worksheet.", false);
+}
+
+function enterFreeGamesMode() {
+  if (!table) return;
+  if (!table.getColumn(FREE_TO_PLAY_FIELD)) {
+    setStatus("Free Games needs the database feed to include the AQ Free To Play column.", true);
+    return;
+  }
+  if (gemstationModeActive) {
+    searchElement.value = "";
+    leaveGemstationMode();
+  }
+  if (freeGamesModeActive) return;
+
+  searchElement.value = "";
+  clearColumnFilters();
+  table.clearFilter(true);
+  freeGamesModeActive = true;
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "true");
+  table.setFilter(globalSearchFilter);
+  setStatus("Free Games: showing games marked Y in Free To Play.", false);
+  updateFilteredCardsButton();
 }
 
 async function toggleFullscreen() {
@@ -1680,9 +1711,20 @@ function addColumnPicker(columns) {
   const newestButton = document.createElement("button");
   newestButton.id = "newest-game-button";
   newestButton.type = "button";
-  newestButton.textContent = "NEWEST GAME";
+  newestButton.textContent = "NEWEST GAMES";
   newestButton.setAttribute("aria-label", "Show the most recently submitted game and browse older submissions");
   newestButton.addEventListener("click", openNewestGame);
+
+  const freeButton = document.createElement("button");
+  freeButton.id = "free-games-button";
+  freeButton.className = "free-games-button";
+  freeButton.type = "button";
+  freeButton.textContent = "FREE GAMES";
+  freeButton.title = "Filter the database to games marked Y in the Free To Play column";
+  freeButton.setAttribute("aria-label", "Show games marked Y in the Free To Play column");
+  freeButton.setAttribute("aria-pressed", "false");
+  freeButton.addEventListener("click", enterFreeGamesMode);
+  freeGamesButton = freeButton;
 
   if (!filteredCardsButton) filteredCardsButton = document.getElementById("view-filtered-cards");
   if (filteredCardsButton && filteredCardsButton.dataset.clickBound !== "true") {
@@ -1708,7 +1750,7 @@ function addColumnPicker(columns) {
   comparisonSelect.disabled = !comparisonFilterField;
   if (!comparisonFilterField) comparisonSelect.title = "The database feed does not include a Comparison column.";
   actionRow.append(comparisonSelect, toggleButton);
-  surpriseControlsRow.append(surpriseButton, newestButton);
+  surpriseControlsRow.append(surpriseButton, newestButton, freeButton);
 
   comparisonSelect.addEventListener("change", function () {
     if (!comparisonFilterField) return;
@@ -1902,10 +1944,12 @@ async function startDatabase() {
       clearButton.addEventListener("click", function () {
         const filtersWereActive = hasActiveUserFilters();
         searchElement.value = "";
-      if (gemstationModeActive) {
-        leaveGemstationMode();
-        return;
-      }
+        if (gemstationModeActive) {
+          leaveGemstationMode();
+          return;
+        }
+        freeGamesModeActive = false;
+        if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
         if (filtersWereActive) sendUsageEvent("database_filters_cleared", { result_count: databaseRows.length });
         clearColumnFilters();
         table.clearFilter(true);

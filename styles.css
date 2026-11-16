@@ -62,6 +62,8 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .page-footer { display: flex; flex: 0 0 auto; justify-content: space-between; gap: 12px; padding: 10px 2px 0; color: #aeb8bf; font-size: .82rem; }
 .header-button-row { grid-column: 1 / -1; display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 8px; }
 .header-button-row button { width: auto; }
+.free-games-button { border-color: #4c8760; color: #b9f0c5; }
+.free-games-button[aria-pressed="true"] { background: #294534; border-color: #83cf9a; color: #d4f7da; }
 .comparison-filter-select { min-height: 42px; max-width: 250px; padding: 8px 30px 8px 11px; border: 1px solid #4b555a; border-radius: 7px; background: #252b2e; color: #eef2f4; font: inherit; font-weight: 650; cursor: pointer; }
 .comparison-filter-select:hover { border-color: #6dc583; background: #30393a; }
 .comparison-filter-select:focus { border-color: #6dc583; outline: 3px solid #6dc58333; }
@@ -381,7 +383,7 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .header-button-row { flex-direction: column; align-items: stretch; }
   .header-button-row button { width: 100%; }
   .header-button-row.surprise-controls-row { flex-direction: row; align-items: stretch; }
-  .header-button-row.surprise-controls-row button { width: auto; flex: 1 1 0; }
+  .header-button-row.surprise-controls-row button { width: auto; flex: 1 1 0; padding-right: 7px; padding-left: 7px; font-size: .8rem; white-space: nowrap; }
   .comparison-filter-select { width: 100%; max-width: none; }
   .comparison-filter-select { text-align: center; text-align-last: center; }
   .surprise-dialog { width: calc(100vw - 16px); max-height: 94vh; max-height: 94dvh; }
