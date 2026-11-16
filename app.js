@@ -1901,6 +1901,49 @@ function addColumnPicker(columns) {
   });
 }
 
+function addColumnHideButtons() {
+  if (!table) return;
+
+  databaseHeaders.forEach(function (title, index) {
+    const field = "c" + index;
+    if (index === 0 || field === GEMSTATION_DATE_FIELD) return;
+
+    const column = table.getColumn(field);
+    const columnElement = column && column.getElement();
+    if (!columnElement || columnElement.querySelector(".column-hide-button")) return;
+
+    const sorter = columnElement.querySelector(".tabulator-col-sorter");
+    if (!sorter) return;
+
+    columnElement.classList.add("has-column-hide-button");
+    const hideButton = document.createElement("button");
+    hideButton.type = "button";
+    hideButton.className = "column-hide-button";
+    hideButton.textContent = "×";
+    hideButton.title = "Hide " + title + " column";
+    hideButton.setAttribute("aria-label", "Hide " + title + " column");
+    ["pointerdown", "mousedown", "touchstart"].forEach(function (eventName) {
+      hideButton.addEventListener(eventName, function (event) {
+        event.stopPropagation();
+      });
+    });
+    hideButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!table || !table.getColumn(field)) return;
+      table.getColumn(field).hide();
+      hiddenColumnFields.add(field);
+      saveHiddenColumns();
+      if (typeof syncColumnPickerCheckboxes === "function") syncColumnPickerCheckboxes();
+      window.requestAnimationFrame(function () {
+        table.redraw(true);
+      });
+    });
+    sorter.appendChild(hideButton);
+  });
+}
+
 async function startDatabase() {
   if (isLoading) return;
   isLoading = true;
@@ -1933,7 +1976,9 @@ async function startDatabase() {
       placeholder: "No games match these filters.",
     });
 
+    table.on("tableBuilt", addColumnHideButtons);
     addColumnPicker(normalized.columns);
+    window.requestAnimationFrame(addColumnHideButtons);
 
     if (!databaseControlsBound) {
       searchElement.addEventListener("input", function () {
