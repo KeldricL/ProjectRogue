@@ -7,6 +7,7 @@ const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
 const GEMSTATION_TRIGGER = "##gemstation";
 const GEMSTATION_DATE_FIELD = "c48"; // AW, zero-based column index
 const FREE_TO_PLAY_FIELD = "c42"; // AQ, zero-based column index
+const STEAM_DECK_STATUS_FIELD = "c43"; // AR, zero-based column index
 const GEMSTATION_VISIBLE_FIELDS = new Set(["c0", "c2", "c3", "c4", "c6", "c42", "c43", GEMSTATION_DATE_FIELD]);
 const UNORDERED_FILTER_GROUPS = [
   { name: "Game Type", fields: ["c6", "c7", "c8"] }, // G-I
@@ -50,12 +51,14 @@ let databaseRows = [];
 let hiddenColumnFields = loadHiddenColumns();
 let gemstationModeActive = false;
 let freeGamesModeActive = false;
+let steamDeckVerifiedModeActive = false;
 let columnPickerToggleButton = null;
 let columnPickerMenu = null;
 let comparisonFilterSelect = null;
 let comparisonFilterField = "";
 let filteredCardsButton = document.getElementById("view-filtered-cards");
 let freeGamesButton = null;
+let steamDeckVerifiedButton = null;
 let surpriseDialogParts = null;
 let cardBrowseMode = "surprise";
 let filteredCardRows = [];
@@ -1531,6 +1534,7 @@ function moveSurpriseHistory(direction) {
 
 function globalSearchFilter(rowData) {
   if (freeGamesModeActive && String(rowData[FREE_TO_PLAY_FIELD] || "").trim().toLocaleUpperCase() !== "Y") return false;
+  if (steamDeckVerifiedModeActive && String(rowData[STEAM_DECK_STATUS_FIELD] || "").trim().toLocaleLowerCase() !== "verified") return false;
   const query = searchElement.value.trim().toLocaleLowerCase();
   if (!query) return true;
 
@@ -1555,7 +1559,7 @@ function applyGlobalSearch() {
   }
   if (gemstationModeActive) leaveGemstationMode();
 
-  if (freeGamesModeActive || searchElement.value.trim() !== "") {
+  if (freeGamesModeActive || steamDeckVerifiedModeActive || searchElement.value.trim() !== "") {
     table.setFilter(globalSearchFilter);
   } else {
     table.clearFilter(); // Keeps the individual column header filters.
@@ -1564,7 +1568,7 @@ function applyGlobalSearch() {
 }
 
 function hasActiveUserFilters() {
-  if (gemstationModeActive || freeGamesModeActive || searchElement.value.trim()) return true;
+  if (gemstationModeActive || freeGamesModeActive || steamDeckVerifiedModeActive || searchElement.value.trim()) return true;
   return Array.from(columnFilterStates.values()).some(function (state) {
     return Boolean(
       String(state.query || "").trim() ||
@@ -1588,7 +1592,9 @@ function enterGemstationMode() {
 
   gemstationModeActive = true;
   freeGamesModeActive = false;
+  steamDeckVerifiedModeActive = false;
   if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
   clearColumnFilters();
   table.clearFilter(true);
   table.getColumns().forEach(function (column) {
@@ -1626,7 +1632,7 @@ function leaveGemstationMode() {
   syncColumnPickerCheckboxes();
 
   const query = searchElement.value.trim();
-  if (query || freeGamesModeActive) table.setFilter(globalSearchFilter);
+  if (query || freeGamesModeActive || steamDeckVerifiedModeActive) table.setFilter(globalSearchFilter);
   else table.clearFilter();
   updateFilteredCardsButton();
   const count = Number(countElement.textContent.replace(/[^0-9]/g, ""));
@@ -1648,10 +1654,45 @@ function enterFreeGamesMode() {
   searchElement.value = "";
   clearColumnFilters();
   table.clearFilter(true);
+  steamDeckVerifiedModeActive = false;
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
   freeGamesModeActive = true;
   if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "true");
   table.setFilter(globalSearchFilter);
   setStatus("Free Games: showing games marked Y in Free To Play.", false);
+  updateFilteredCardsButton();
+}
+
+function enterSteamDeckVerifiedMode() {
+  if (!table) return;
+  if (!table.getColumn(STEAM_DECK_STATUS_FIELD)) {
+    setStatus("Steam Deck Verified needs the database feed to include column AR, Steam Deck Status.", true);
+    return;
+  }
+  if (steamDeckVerifiedModeActive) return;
+
+  if (gemstationModeActive) {
+    searchElement.value = "";
+    leaveGemstationMode();
+  }
+
+  searchElement.value = "";
+  clearColumnFilters();
+  table.clearFilter(true);
+  freeGamesModeActive = false;
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+  steamDeckVerifiedModeActive = true;
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "true");
+  table.setFilter(globalSearchFilter);
+  setStatus('Steam Deck Verified: showing games marked "Verified".', false);
+  sendUsageEvent("database_filter", {
+    column_name: "Steam Deck Status",
+    filter_type: "button",
+    selected_value_count: 1,
+    selected_values: "Verified",
+    notes_only: false,
+    result_count: activeResultCount(),
+  });
   updateFilteredCardsButton();
 }
 
@@ -1691,7 +1732,9 @@ function addColumnPicker(columns) {
   actionRow.className = "header-button-row";
   const surpriseControlsRow = document.createElement("div");
   surpriseControlsRow.className = "header-button-row surprise-controls-row";
-  headerActions.append(actionRow, surpriseControlsRow);
+  const steamDeckVerifiedRow = document.createElement("div");
+  steamDeckVerifiedRow.className = "header-button-row steam-deck-verified-row";
+  headerActions.append(actionRow, surpriseControlsRow, steamDeckVerifiedRow);
 
   const toggleButton = document.createElement("button");
   toggleButton.id = "column-picker-toggle";
@@ -1726,6 +1769,16 @@ function addColumnPicker(columns) {
   freeButton.addEventListener("click", enterFreeGamesMode);
   freeGamesButton = freeButton;
 
+  const steamDeckVerified = document.createElement("button");
+  steamDeckVerified.id = "steam-deck-verified-button";
+  steamDeckVerified.type = "button";
+  steamDeckVerified.textContent = "Steam Deck Verified";
+  steamDeckVerified.title = 'Filter games to Steam Deck Status "Verified"';
+  steamDeckVerified.setAttribute("aria-label", 'Show games with Steam Deck Status "Verified"');
+  steamDeckVerified.setAttribute("aria-pressed", "false");
+  steamDeckVerified.addEventListener("click", enterSteamDeckVerifiedMode);
+  steamDeckVerifiedButton = steamDeckVerified;
+
   if (!filteredCardsButton) filteredCardsButton = document.getElementById("view-filtered-cards");
   if (filteredCardsButton && filteredCardsButton.dataset.clickBound !== "true") {
     filteredCardsButton.addEventListener("click", openFilteredCards);
@@ -1751,6 +1804,7 @@ function addColumnPicker(columns) {
   if (!comparisonFilterField) comparisonSelect.title = "The database feed does not include a Comparison column.";
   actionRow.append(comparisonSelect, toggleButton);
   surpriseControlsRow.append(surpriseButton, newestButton, freeButton);
+  steamDeckVerifiedRow.appendChild(steamDeckVerified);
 
   comparisonSelect.addEventListener("change", function () {
     if (!comparisonFilterField) return;
@@ -1994,7 +2048,9 @@ async function startDatabase() {
           return;
         }
         freeGamesModeActive = false;
+        steamDeckVerifiedModeActive = false;
         if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+        if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
         if (filtersWereActive) sendUsageEvent("database_filters_cleared", { result_count: databaseRows.length });
         clearColumnFilters();
         table.clearFilter(true);

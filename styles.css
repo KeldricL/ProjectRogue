@@ -424,6 +424,9 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
 .header-button-row.surprise-controls-row > #surprise-me-button,
 .header-button-row.surprise-controls-row > #free-games-button { flex: 1 1 0; }
 .header-button-row.surprise-controls-row > #newest-game-button { flex: 1.4 1 0; white-space: nowrap; }
+.header-button-row.steam-deck-verified-row { justify-content: flex-start; }
+.header-button-row.steam-deck-verified-row > #steam-deck-verified-button { flex: 0 0 auto; width: auto; border-color: #4c8760; color: #b9f0c5; white-space: nowrap; }
+.header-button-row.steam-deck-verified-row > #steam-deck-verified-button[aria-pressed="true"] { background: #294534; border-color: #83cf9a; color: #d4f7da; }
 
 @media (max-width: 600px) {
   .header-button-row { flex-direction: row; align-items: stretch; }
