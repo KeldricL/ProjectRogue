@@ -421,6 +421,9 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
 .header-button-row > select { width: auto; min-width: 0; flex: 1 1 0; }
 .header-button-row > .comparison-filter-select { max-width: none; }
 .header-button-row.surprise-controls-row > button { padding-right: 8px; padding-left: 8px; }
+.header-button-row.surprise-controls-row > #surprise-me-button,
+.header-button-row.surprise-controls-row > #free-games-button { flex: 1 1 0; }
+.header-button-row.surprise-controls-row > #newest-game-button { flex: 1.4 1 0; white-space: nowrap; }
 
 @media (max-width: 600px) {
   .header-button-row { flex-direction: row; align-items: stretch; }
