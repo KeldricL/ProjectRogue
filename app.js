@@ -1107,17 +1107,27 @@ function appendSurpriseDetails(parent, row, excludedFields) {
   const yesFeatures = new Set();
   const alwaysGreenHeaders = new Set(["dlc", "achievements", "workshop"]);
   const alwaysGreenFields = new Set();
+  const freeToPlayFields = new Set();
+  const visibleDetailFields = new Set();
   databaseHeaders.forEach(function (header, index) {
     const normalizedHeader = cleanGameValue(header).replace(/[?]/g, "").toLocaleLowerCase();
     if (alwaysGreenHeaders.has(normalizedHeader)) alwaysGreenFields.add(index);
+    if (normalizedHeader === "free to play") freeToPlayFields.add(index);
+    if (normalizedHeader === "steam deck status") visibleDetailFields.add(index);
   });
 
   for (let index = 6; index < databaseHeaders.length; index += 1) {
     const isAlwaysGreenField = alwaysGreenFields.has(index);
-    if (index > 38 && !isAlwaysGreenField) continue;
+    const isFreeToPlayField = freeToPlayFields.has(index);
+    const isVisibleDetailField = visibleDetailFields.has(index);
+    if (index > 38 && !isAlwaysGreenField && !isFreeToPlayField && !isVisibleDetailField) continue;
     const field = "c" + index;
     const value = cleanGameValue(row[field]);
     if (excludedFields.has(index)) continue;
+    if (isFreeToPlayField) {
+      if (/^y$/i.test(value)) yesFeatures.add(databaseHeaders[index]);
+      continue;
+    }
     if (isAlwaysGreenField) {
       if (value && value.toLocaleLowerCase() !== "n") yesFeatures.add(databaseHeaders[index]);
       continue;
