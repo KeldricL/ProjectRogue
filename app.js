@@ -1391,15 +1391,89 @@ function getSurpriseThumbnailCandidates(link) {
   return candidates;
 }
 
+let affiliateCatalogPromise = null;
+
+function normalizeAffiliateGameName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\b(pc|windows)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function loadAffiliateCatalog() {
+  if (!affiliateCatalogPromise) {
+    affiliateCatalogPromise = fetch("affiliate-links.json?v=20261117-affiliate-thumbnails-1")
+      .then(function (response) {
+        if (!response.ok) throw new Error("Affiliate catalog unavailable");
+        return response.json();
+      })
+      .catch(function () { return {}; });
+  }
+  return affiliateCatalogPromise;
+}
+
 function trackSurpriseLinkClick(row, link, index) {
   let hostname = "";
   try { hostname = new URL(link.url).hostname; } catch (_error) {}
   sendUsageEvent("database_link_click", {
     game_name: safeAnalyticsText(row.c0, 80),
-    column_name: safeAnalyticsText(databaseHeaders[index], 60) || "Game link",
+    column_name: safeAnalyticsText(link.analyticsColumnName || databaseHeaders[index], 60) || "Game link",
     link_domain: safeAnalyticsText(hostname, 100),
     destination_url: analyticsDestinationUrl(link.url),
   });
+}
+
+function appendAffiliateLinkCard(parent, row, store, offer) {
+  if (!offer || !/^https?:\/\//i.test(offer.url || "")) return;
+  const labels = { humble: "Humble", gmg: "GMG" };
+  const label = labels[store];
+  const link = {
+    url: offer.url,
+    kind: store,
+    analyticsColumnName: store === "humble" ? "Humble affiliate link" : "GMG affiliate link",
+  };
+  const linkCard = document.createElement("div");
+  linkCard.className = "surprise-link-card surprise-affiliate-link-card";
+  const labelAnchor = document.createElement("a");
+  labelAnchor.href = offer.url;
+  labelAnchor.target = "_blank";
+  labelAnchor.rel = "noopener noreferrer sponsored";
+  labelAnchor.className = "surprise-game-link";
+  labelAnchor.textContent = label;
+  labelAnchor.setAttribute("aria-label", "Shop " + cleanGameValue(row.c0) + " at " + label + " (affiliate link)");
+  labelAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link); });
+  linkCard.appendChild(labelAnchor);
+
+  const thumbnailAnchor = document.createElement("a");
+  thumbnailAnchor.href = offer.url;
+  thumbnailAnchor.target = "_blank";
+  thumbnailAnchor.rel = "noopener noreferrer sponsored";
+  thumbnailAnchor.className = "surprise-thumbnail-link";
+  thumbnailAnchor.setAttribute("aria-label", "View " + cleanGameValue(row.c0) + " at " + label + " (affiliate link; opens in a new tab)");
+  thumbnailAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link); });
+  if (offer.image && /^https?:\/\//i.test(offer.image)) {
+    const image = document.createElement("img");
+    image.alt = "";
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", function () {
+      image.remove();
+      thumbnailAnchor.classList.add("thumbnail-unavailable");
+      thumbnailAnchor.textContent = label;
+    });
+    image.src = offer.image;
+    thumbnailAnchor.appendChild(image);
+  } else {
+    thumbnailAnchor.classList.add("thumbnail-unavailable");
+    thumbnailAnchor.textContent = label;
+  }
+  linkCard.appendChild(thumbnailAnchor);
+  parent.appendChild(linkCard);
 }
 
 function appendSurpriseLinks(parent, row) {
@@ -1417,63 +1491,72 @@ function appendSurpriseLinks(parent, row) {
   foundLinks.sort(function (a, b) { return order[a.kind] - order[b.kind]; });
 
   appendSurpriseSectionHeading(parent, "Links");
-  if (!foundLinks.length) {
-    const message = document.createElement("p");
-    message.className = "surprise-no-links";
-    message.textContent = "No game links are listed.";
-    parent.appendChild(message);
-    return;
-  }
-
   const linkCards = document.createElement("div");
   linkCards.className = "surprise-link-cards";
-  foundLinks.forEach(function (link) {
-    const kindLabel = { youtube: "YouTube", steam: "Steam", website: "Website", itch: "itch.io" }[link.kind];
-    const label = link.label || kindLabel;
-    const linkCard = document.createElement("div");
-    linkCard.className = "surprise-link-card";
-    const anchor = document.createElement("a");
-    anchor.href = link.url;
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    anchor.className = "surprise-game-link";
-    anchor.textContent = label;
-    anchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
-    linkCard.appendChild(anchor);
+  let noLinksMessage = null;
+  if (!foundLinks.length) {
+    noLinksMessage = document.createElement("p");
+    noLinksMessage.className = "surprise-no-links";
+    noLinksMessage.textContent = "No game links are listed.";
+    parent.appendChild(noLinksMessage);
+  } else {
+    foundLinks.forEach(function (link) {
+      const kindLabel = { youtube: "YouTube", steam: "Steam", website: "Website", itch: "itch.io" }[link.kind];
+      const label = link.label || kindLabel;
+      const linkCard = document.createElement("div");
+      linkCard.className = "surprise-link-card";
+      const anchor = document.createElement("a");
+      anchor.href = link.url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.className = "surprise-game-link";
+      anchor.textContent = label;
+      anchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
+      linkCard.appendChild(anchor);
 
-    const thumbnailAnchor = document.createElement("a");
-    thumbnailAnchor.href = link.url;
-    thumbnailAnchor.target = "_blank";
-    thumbnailAnchor.rel = "noopener noreferrer";
-    thumbnailAnchor.className = "surprise-thumbnail-link";
-    thumbnailAnchor.setAttribute("aria-label", label + " thumbnail (opens in a new tab)");
-    thumbnailAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
-    const thumbnailCandidates = getSurpriseThumbnailCandidates(link);
-    if (thumbnailCandidates.length) {
-      const image = document.createElement("img");
-      image.alt = "";
-      image.loading = "lazy";
-      let thumbnailCandidateIndex = 0;
-      image.addEventListener("error", function () {
-        thumbnailCandidateIndex += 1;
-        if (thumbnailCandidateIndex < thumbnailCandidates.length) {
-          image.src = thumbnailCandidates[thumbnailCandidateIndex];
-        } else {
-          thumbnailAnchor.classList.add("thumbnail-unavailable");
-          image.remove();
-          thumbnailAnchor.textContent = kindLabel;
-        }
-      });
-      thumbnailAnchor.appendChild(image);
-      image.src = thumbnailCandidates[0];
-    } else {
-      thumbnailAnchor.classList.add("thumbnail-unavailable");
-      thumbnailAnchor.textContent = kindLabel;
-    }
-    linkCard.appendChild(thumbnailAnchor);
-    linkCards.appendChild(linkCard);
+      const thumbnailAnchor = document.createElement("a");
+      thumbnailAnchor.href = link.url;
+      thumbnailAnchor.target = "_blank";
+      thumbnailAnchor.rel = "noopener noreferrer";
+      thumbnailAnchor.className = "surprise-thumbnail-link";
+      thumbnailAnchor.setAttribute("aria-label", label + " thumbnail (opens in a new tab)");
+      thumbnailAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
+      const thumbnailCandidates = getSurpriseThumbnailCandidates(link);
+      if (thumbnailCandidates.length) {
+        const image = document.createElement("img");
+        image.alt = "";
+        image.loading = "lazy";
+        let thumbnailCandidateIndex = 0;
+        image.addEventListener("error", function () {
+          thumbnailCandidateIndex += 1;
+          if (thumbnailCandidateIndex < thumbnailCandidates.length) {
+            image.src = thumbnailCandidates[thumbnailCandidateIndex];
+          } else {
+            thumbnailAnchor.classList.add("thumbnail-unavailable");
+            image.remove();
+            thumbnailAnchor.textContent = kindLabel;
+          }
+        });
+        thumbnailAnchor.appendChild(image);
+        image.src = thumbnailCandidates[0];
+      } else {
+        thumbnailAnchor.classList.add("thumbnail-unavailable");
+        thumbnailAnchor.textContent = kindLabel;
+      }
+      linkCard.appendChild(thumbnailAnchor);
+      linkCards.appendChild(linkCard);
+    });
+    parent.appendChild(linkCards);
+  }
+
+  loadAffiliateCatalog().then(function (catalog) {
+    const offers = catalog[normalizeAffiliateGameName(row.c0)];
+    if (!offers || (!offers.humble && !offers.gmg)) return;
+    if (noLinksMessage) noLinksMessage.remove();
+    if (!linkCards.isConnected) parent.appendChild(linkCards);
+    appendAffiliateLinkCard(linkCards, row, "humble", offers.humble);
+    appendAffiliateLinkCard(linkCards, row, "gmg", offers.gmg);
   });
-  parent.appendChild(linkCards);
 }
 
 function populateGameCardContent(parts, row) {
