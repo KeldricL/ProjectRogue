@@ -913,8 +913,12 @@ function findSurpriseCardFields() {
 
 function hasAtLeastThreeDataPoints(row) {
   let count = 0;
-  for (let index = 5; index <= 38; index += 1) {
-    const value = cleanGameValue(row["c" + index]);
+  const eligibleFields = [];
+  for (let index = 5; index <= 38; index += 1) eligibleFields.push("c" + index);
+  eligibleFields.push(FREE_TO_PLAY_FIELD, STEAM_DECK_STATUS_FIELD);
+
+  for (const field of eligibleFields) {
+    const value = cleanGameValue(row[field]);
     if (!value || NON_DATA_VALUES.has(value.toLocaleLowerCase())) continue;
     count += 1;
     if (count >= 3) return true;
