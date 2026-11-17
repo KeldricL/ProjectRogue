@@ -68,6 +68,8 @@ let surpriseHistory = [];
 let surpriseHistoryIndex = -1;
 let surpriseDefinitions = new Map();
 let surpriseDefinitionsPromise = null;
+let shareFilteredViewButton = document.getElementById("share-filtered-view");
+let sharedViewRestored = false;
 let syncColumnPickerCheckboxes = function () {};
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
@@ -1588,9 +1590,119 @@ function hasActiveUserFilters() {
   });
 }
 
+function encodeSharedView(state) {
+  const bytes = new TextEncoder().encode(JSON.stringify(state));
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function decodeSharedView(encoded) {
+  const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - base64.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function createSharedViewState() {
+  const filters = {};
+  columnFilterStates.forEach(function (state, field) {
+    const query = String(state.query || "");
+    const selectedValues = Array.isArray(state.selectedValues) ? state.selectedValues : [];
+    if (query.trim() || selectedValues.length || state.notesOnly) {
+      filters[field] = { q: query, v: selectedValues, n: Boolean(state.notesOnly) };
+    }
+  });
+  return {
+    v: 1,
+    q: searchElement.value,
+    mode: freeGamesModeActive ? "free" : (steamDeckVerifiedModeActive ? "verified" : ""),
+    filters: filters,
+  };
+}
+
+async function copyFilteredViewLink() {
+  if (!shareFilteredViewButton) return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("pr");
+  url.searchParams.set("pr", encodeSharedView(createSharedViewState()));
+  const shareUrl = url.toString();
+  if (shareUrl.length > 2000) {
+    setStatus("This filter combination makes a long link. Narrow the selections, then copy the link again.", true);
+    return;
+  }
+
+  let copiedToClipboard = false;
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    copiedToClipboard = true;
+  } catch (_error) {
+    window.prompt("Copy this link to share the current database filters:", shareUrl);
+  }
+  const originalText = "Copy link to these filters";
+  shareFilteredViewButton.textContent = copiedToClipboard ? "Link copied!" : "Link ready";
+  window.setTimeout(function () {
+    if (shareFilteredViewButton) shareFilteredViewButton.textContent = originalText;
+  }, 1800);
+}
+
+function restoreSharedView() {
+  if (sharedViewRestored) return;
+  sharedViewRestored = true;
+  const encoded = new URL(window.location.href).searchParams.get("pr");
+  if (!encoded || encoded.length > 12000) return;
+
+  let sharedView;
+  try {
+    sharedView = decodeSharedView(encoded);
+  } catch (_error) {
+    setStatus("The shared filter link could not be read. Clear the link parameter and try again.", true);
+    return;
+  }
+  if (!sharedView || sharedView.v !== 1 || typeof sharedView !== "object") return;
+
+  searchElement.value = typeof sharedView.q === "string" ? sharedView.q.slice(0, 500) : "";
+  const mode = sharedView.mode === "free" || sharedView.mode === "verified" ? sharedView.mode : "";
+  freeGamesModeActive = mode === "free";
+  steamDeckVerifiedModeActive = mode === "verified";
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", String(freeGamesModeActive));
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", String(steamDeckVerifiedModeActive));
+
+  const filters = sharedView.filters && typeof sharedView.filters === "object" ? sharedView.filters : {};
+  Object.keys(filters).forEach(function (field) {
+    if (!/^c\d+$/.test(field) || Number(field.slice(1)) >= databaseHeaders.length) return;
+    const saved = filters[field];
+    if (!saved || typeof saved !== "object") return;
+    const state = getColumnFilterState(field);
+    state.query = typeof saved.q === "string" ? saved.q.slice(0, 500) : "";
+    state.selectedValues = Array.isArray(saved.v)
+      ? saved.v.filter(function (value) { return typeof value === "string"; }).slice(0, 300)
+      : [];
+    state.notesOnly = Boolean(saved.n);
+    const control = columnFilterControls.get(field);
+    if (control) {
+      control.input.value = state.query;
+      control.success({ query: state.query, selectedValues: state.selectedValues.slice(), notesOnly: state.notesOnly });
+      updateChoicesButton(control.button, state, field);
+    }
+    if (field === comparisonFilterField && comparisonFilterSelect) {
+      const match = COMPARISON_FILTER_OPTIONS.find(function (option) {
+        return option.abbreviation.toLocaleLowerCase() === state.query.trim().toLocaleLowerCase();
+      });
+      comparisonFilterSelect.value = match ? match.abbreviation : "";
+    }
+  });
+  updateDuplicateFilterWarning();
+  updateFilteredCardsButton();
+}
+
 function updateFilteredCardsButton() {
   if (!filteredCardsButton) filteredCardsButton = document.getElementById("view-filtered-cards");
   if (filteredCardsButton) filteredCardsButton.hidden = !hasActiveUserFilters();
+  if (!shareFilteredViewButton) shareFilteredViewButton = document.getElementById("share-filtered-view");
+  if (shareFilteredViewButton) shareFilteredViewButton.hidden = !hasActiveUserFilters() || gemstationModeActive;
 }
 
 function enterGemstationMode() {
@@ -2066,6 +2178,7 @@ async function startDatabase() {
         table.clearFilter(true);
         updateFilteredCardsButton();
       });
+    restoreSharedView();
     applyGlobalSearch();
       databaseControlsBound = true;
     }
@@ -2090,6 +2203,7 @@ async function startDatabase() {
   }
 }
 
+if (shareFilteredViewButton) shareFilteredViewButton.addEventListener("click", copyFilteredViewLink);
 retryButton.addEventListener("click", startDatabase);
 
 startDatabase();
