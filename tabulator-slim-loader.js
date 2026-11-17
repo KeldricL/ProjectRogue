@@ -27,7 +27,7 @@ window.Tabulator = Tabulator;
 
 // Start the existing database application only after Tabulator is ready.
 const app = document.createElement("script");
-app.src = "app.js?v=20261117-affiliate-thumbnails-1";
+app.src = "app.js?v=20261117-affiliate-thumbnails-2";
 app.onerror = function () {
   const status = document.getElementById("status");
   if (status) status.textContent = "The database application could not load. Please reload the page.";

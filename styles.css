@@ -347,11 +347,12 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-submit-missing:hover { border-color: #a4e8b2; background: #d4f7da; color: #17201d; }
 dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing { border-color: #83cf9a !important; background-color: #b8efc3 !important; color: #23372a !important; }
 dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing:hover { border-color: #a4e8b2 !important; background-color: #d4f7da !important; color: #17201d !important; }
-.surprise-link-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 10px; }
-.surprise-link-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; width: 180px; min-width: 0; }
+.surprise-link-cards { display: grid; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.surprise-link-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; width: auto; min-width: 0; }
 .surprise-game-link { display: inline-flex; justify-self: start; align-items: center; max-width: 100%; min-height: 30px; margin: 0; padding: 4px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
 .surprise-game-link:hover { border-color: #83cf9a; background: #304237; }
-.surprise-thumbnail-link { display: flex; width: 100%; height: 102px; margin: 0; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
+.surprise-affiliate-link-card .surprise-game-link { justify-content: center; padding-right: 5px; padding-left: 5px; font-size: clamp(.62rem, .9vw, .82rem); line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+.surprise-thumbnail-link { display: flex; width: 100%; height: auto; aspect-ratio: 16 / 9; margin: 0; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
 .surprise-thumbnail-link img { display: block; width: 100%; height: 100%; padding: 2px; object-fit: contain; }
 .surprise-thumbnail-link.thumbnail-unavailable { font-size: .82rem; font-weight: 700; }
 .surprise-no-links { margin: 0; color: #aeb8bf; }
@@ -369,7 +370,7 @@ dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing:hover { b
 .compare-game-card .surprise-tag-columns { gap: 8px; }
 .compare-game-card .surprise-tag-column { gap: 8px; }
 .compare-game-card .surprise-detail-grid { grid-template-columns: 1fr; gap: 5px; }
-.compare-game-card .surprise-link-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.compare-game-card .surprise-link-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .compare-game-card .surprise-link-card { width: auto; gap: 5px; }
 .compare-game-card .surprise-thumbnail-link { height: auto; aspect-ratio: 16 / 9; }
 .compare-remove-game { flex: 0 0 auto; min-height: 30px; padding: 4px 8px; font-size: .78rem; }
@@ -443,7 +444,7 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .surprise-primary-fields { grid-template-columns: 1fr; }
   .surprise-detail-grid { grid-template-columns: 1fr; }
   .surprise-thumbnail-link { height: auto; aspect-ratio: 16 / 9; }
-  .surprise-link-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .surprise-link-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .surprise-link-card { width: auto; }
   .column-picker-menu { position: fixed; top: 50%; right: auto; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 24px)); max-height: min(70vh, 520px); }
   .column-value-menu { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 20px)); max-height: min(72vh, 560px); }
@@ -513,7 +514,7 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .surprise-links { margin-top: 12px; padding-top: 9px; }
   .surprise-submit-missing { min-height: 34px; margin-top: 16px; padding: 6px 10px; font-size: .78rem; }
   .surprise-link-card { gap: 5px; }
-  .surprise-game-link { min-height: 26px; padding: 3px 8px; font-size: .8rem; }
+  .surprise-game-link { min-height: 26px; padding: 3px 5px; font-size: .72rem; line-height: 1.15; overflow-wrap: anywhere; }
   .surprise-thumbnail-link { max-height: 86px; }
 }
 

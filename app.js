@@ -1430,12 +1430,12 @@ function trackSurpriseLinkClick(row, link, index) {
 
 function appendAffiliateLinkCard(parent, row, store, offer) {
   if (!offer || !/^https?:\/\//i.test(offer.url || "")) return;
-  const labels = { humble: "Humble", gmg: "GMG" };
+  const labels = { humble: "Humble", gmg: "GreenmanGaming" };
   const label = labels[store];
   const link = {
     url: offer.url,
     kind: store,
-    analyticsColumnName: store === "humble" ? "Humble affiliate link" : "GMG affiliate link",
+    analyticsColumnName: store === "humble" ? "Humble affiliate link" : "GreenmanGaming affiliate link",
   };
   const linkCard = document.createElement("div");
   linkCard.className = "surprise-link-card surprise-affiliate-link-card";
