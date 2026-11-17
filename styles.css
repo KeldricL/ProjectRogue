@@ -35,6 +35,9 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .share-filtered-view[hidden] { display: none; }
 .compare-selected-games { min-height: 34px; padding: 5px 11px; border-color: #526b88; color: #c7dcf4; white-space: nowrap; }
 .compare-selected-games[hidden] { display: none; }
+.clear-compare-selection { min-height: 34px; padding: 5px 11px; border-color: #73575a; color: #efc2c2; white-space: nowrap; }
+.clear-compare-selection:hover { border-color: #c07d7d; background: #392a2c; }
+.clear-compare-selection[hidden] { display: none; }
 .compare-selected-games:disabled { opacity: .62; cursor: not-allowed; }
 .want-to-play-filter { min-height: 34px; padding: 5px 11px; border-color: #806a3c; color: #f1d79a; white-space: nowrap; }
 .want-to-play-filter[hidden] { display: none; }

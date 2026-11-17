@@ -62,6 +62,7 @@ let comparisonFilterSelect = null;
 let comparisonFilterField = "";
 let filteredCardsButton = document.getElementById("view-filtered-cards");
 let compareSelectedButton = document.getElementById("compare-selected-games");
+let clearCompareButton = document.getElementById("clear-compare-selection");
 let wantToPlayFilterButton = document.getElementById("want-to-play-filter");
 let freeGamesButton = null;
 let steamDeckVerifiedButton = null;
@@ -1139,14 +1140,29 @@ function updateWantToPlayButton() {
 
 function updateCompareButton() {
   if (!compareSelectedButton) compareSelectedButton = document.getElementById("compare-selected-games");
+  if (!clearCompareButton) clearCompareButton = document.getElementById("clear-compare-selection");
   if (!compareSelectedButton) return;
   const count = selectedCompareRows.length;
   compareSelectedButton.textContent = "Compare selected (" + count + "/3)";
   compareSelectedButton.hidden = count === 0;
   compareSelectedButton.disabled = count < 2;
   compareSelectedButton.title = count < 2 ? "Select at least two games to compare." : "Compare the selected games side by side.";
+  if (clearCompareButton) {
+    clearCompareButton.hidden = count === 0;
+    clearCompareButton.title = "Remove all selected games from comparison.";
+  }
 }
 
+function clearCompareSelection() {
+  if (!selectedCompareRows.length) return;
+  selectedCompareRows = [];
+  updateCompareButton();
+  if (surpriseDialogParts && surpriseDialogParts.currentRow) {
+    updateSurpriseCardActionButtons(surpriseDialogParts.currentRow);
+  }
+  if (compareDialogParts) renderCompareCards();
+  setStatus("Comparison selection cleared.", false);
+}
 function updateSurpriseCardActionButtons(row) {
   if (!surpriseDialogParts) return;
   const key = favoriteKeyForGame(row);
@@ -2087,7 +2103,13 @@ function enterSteamDeckVerifiedMode() {
     setStatus("Steam Deck Verified needs the database feed to include column AR, Steam Deck Status.", true);
     return;
   }
-  if (steamDeckVerifiedModeActive) return;
+  if (steamDeckVerifiedModeActive) {
+    steamDeckVerifiedModeActive = false;
+    if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
+    applyGlobalSearch();
+    setStatus("Steam Deck Verified filter cleared.", false);
+    return;
+  }
 
   if (gemstationModeActive) {
     searchElement.value = "";
@@ -2537,6 +2559,7 @@ async function startDatabase() {
 
 if (shareFilteredViewButton) shareFilteredViewButton.addEventListener("click", copyFilteredViewLink);
 if (compareSelectedButton) compareSelectedButton.addEventListener("click", openSelectedComparison);
+if (clearCompareButton) clearCompareButton.addEventListener("click", clearCompareSelection);
 if (wantToPlayFilterButton) wantToPlayFilterButton.addEventListener("click", enterWantToPlayMode);
 updateWantToPlayButton();
 updateCompareButton();
