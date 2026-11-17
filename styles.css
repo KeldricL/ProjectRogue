@@ -568,3 +568,31 @@ dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-
     flex: 0 0 260px;
   }
 }
+
+
+/* Stack compare cards on phone screens so each full card is readable without sideways scrolling. */
+@media (max-width: 600px) {
+  dialog.compare-dialog {
+    width: calc(100vw - 12px);
+    max-width: calc(100vw - 12px);
+    max-height: 96vh;
+    max-height: 96dvh;
+  }
+  dialog.compare-dialog > .compare-card-grid {
+    flex-direction: column;
+    align-items: stretch;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(96vh - 56px);
+    max-height: calc(96dvh - 56px);
+  }
+  dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-card {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: none;
+  }
+  dialog.compare-dialog .compare-game-card > .surprise-card-body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+}
