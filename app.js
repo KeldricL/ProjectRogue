@@ -1404,10 +1404,9 @@ function openSurpriseMe() {
     if (!table) return;
     cardBrowseMode = "surprise";
     try { loadSurpriseDefinitions(); } catch (_error) {}
-    const activeRows = table.getData("active");
-    surpriseEligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
+    surpriseEligibleRows = databaseRows.filter(hasAtLeastThreeDataPoints);
     if (!surpriseEligibleRows.length) {
-      setStatus("No games with at least 3 data points match the current search and filters.", true);
+      setStatus("No games in the database have at least 3 meaningful data points.", true);
       return;
     }
     const selected = surpriseEligibleRows[Math.floor(Math.random() * surpriseEligibleRows.length)];
@@ -1785,11 +1784,17 @@ function enterFreeGamesMode() {
     setStatus("Free Games needs the database feed to include the AQ Free To Play column.", true);
     return;
   }
+  if (freeGamesModeActive) {
+    freeGamesModeActive = false;
+    if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+    applyGlobalSearch();
+    setStatus("Free Games filter cleared.", false);
+    return;
+  }
   if (gemstationModeActive) {
     searchElement.value = "";
     leaveGemstationMode();
   }
-  if (freeGamesModeActive) return;
 
   searchElement.value = "";
   clearColumnFilters();
