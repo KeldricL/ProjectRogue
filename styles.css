@@ -599,3 +599,32 @@ dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-
     overflow: visible;
   }
 }
+
+
+/* Also stack comparison cards on touch devices when the embedded frame reports a desktop-sized viewport. */
+@media (max-width: 900px), (hover: none) and (pointer: coarse) and (max-width: 1400px) {
+  dialog.compare-dialog {
+    width: min(700px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
+    max-height: 96vh;
+    max-height: 96dvh;
+  }
+  dialog.compare-dialog > .compare-card-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(96vh - 56px);
+    max-height: calc(96dvh - 56px);
+  }
+  dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-card {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: none;
+  }
+  dialog.compare-dialog .compare-game-card > .surprise-card-body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+}
