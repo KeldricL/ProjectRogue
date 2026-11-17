@@ -33,6 +33,9 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .view-filtered-cards[hidden] { display: none; }
 .share-filtered-view { min-height: 34px; padding: 5px 11px; border-color: #526b88; color: #c7dcf4; white-space: nowrap; }
 .share-filtered-view[hidden] { display: none; }
+.share-link-fallback { display: flex; flex: 1 1 100%; align-items: center; gap: 8px; color: #c7dcf4; font-size: .84rem; }
+.share-link-fallback[hidden] { display: none; }
+.share-link-fallback input { flex: 1 1 auto; width: min(100%, 720px); min-width: 0; min-height: 34px; padding: 6px 9px; border: 1px solid #526b88; border-radius: 6px; background: #171c1e; color: #eef2f4; font: inherit; font-size: .78rem; }
 .retry-button { min-height: 34px; padding: 5px 11px; border-color: #6dc583; color: #b9f0c5; }
 .retry-button[hidden] { display: none; }
 .table-frame { flex: 1 1 auto; height: auto; min-height: 0; overflow: hidden; border: 1px solid #41494d; border-radius: 9px; background: #1c2225; box-shadow: 0 5px 18px #00000035; }

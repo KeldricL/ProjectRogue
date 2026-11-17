@@ -69,6 +69,8 @@ let surpriseHistoryIndex = -1;
 let surpriseDefinitions = new Map();
 let surpriseDefinitionsPromise = null;
 let shareFilteredViewButton = document.getElementById("share-filtered-view");
+let shareLinkFallback = document.getElementById("share-link-fallback");
+let shareLinkText = document.getElementById("share-link-text");
 let sharedViewRestored = false;
 let syncColumnPickerCheckboxes = function () {};
 const columnFilterStates = new Map();
@@ -1625,7 +1627,9 @@ function createSharedViewState() {
 
 async function copyFilteredViewLink() {
   if (!shareFilteredViewButton) return;
-  const url = new URL(window.location.href);
+  const currentFrameUrl = new URL(window.location.href);
+  const shareBase = currentFrameUrl.searchParams.get("shareBase");
+  const url = shareBase ? new URL(shareBase) : currentFrameUrl;
   url.searchParams.delete("pr");
   url.searchParams.set("pr", encodeSharedView(createSharedViewState()));
   const shareUrl = url.toString();
@@ -1639,12 +1643,20 @@ async function copyFilteredViewLink() {
     await navigator.clipboard.writeText(shareUrl);
     copiedToClipboard = true;
   } catch (_error) {
-    window.prompt("Copy this link to share the current database filters:", shareUrl);
+    if (!shareLinkFallback) shareLinkFallback = document.getElementById("share-link-fallback");
+    if (!shareLinkText) shareLinkText = document.getElementById("share-link-text");
+    if (shareLinkFallback && shareLinkText) {
+      shareLinkText.value = shareUrl;
+      shareLinkFallback.hidden = false;
+      shareLinkText.focus();
+      shareLinkText.select();
+      setStatus("Clipboard access is blocked in this embed. The link is selected below; press Ctrl+C to copy it.", true);
+    }
   }
   const originalText = "Copy link to these filters";
-  shareFilteredViewButton.textContent = copiedToClipboard ? "Link copied!" : "Link ready";
+  shareFilteredViewButton.textContent = copiedToClipboard ? "Link copied!" : "Copy link manually below";
   window.setTimeout(function () {
-    if (shareFilteredViewButton) shareFilteredViewButton.textContent = originalText;
+    if (shareFilteredViewButton && copiedToClipboard) shareFilteredViewButton.textContent = originalText;
   }, 1800);
 }
 
@@ -1703,6 +1715,8 @@ function updateFilteredCardsButton() {
   if (filteredCardsButton) filteredCardsButton.hidden = !hasActiveUserFilters();
   if (!shareFilteredViewButton) shareFilteredViewButton = document.getElementById("share-filtered-view");
   if (shareFilteredViewButton) shareFilteredViewButton.hidden = !hasActiveUserFilters() || gemstationModeActive;
+  if (!shareLinkFallback) shareLinkFallback = document.getElementById("share-link-fallback");
+  if (shareLinkFallback && (!hasActiveUserFilters() || gemstationModeActive)) shareLinkFallback.hidden = true;
 }
 
 function enterGemstationMode() {

@@ -16,7 +16,7 @@
     });
   </script>
   <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.5.0/dist/css/tabulator.min.css">
-  <link rel="stylesheet" href="styles.css?v=20261116-share-filters-1">
+  <link rel="stylesheet" href="styles.css?v=20261116-share-filters-3">
 </head>
 <body>
   <main class="page-shell">
@@ -38,6 +38,10 @@
     <div class="database-status-row">
       <button id="view-filtered-cards" class="view-filtered-cards" type="button" hidden>View these game cards</button>
       <button id="share-filtered-view" class="share-filtered-view" type="button" hidden>Copy link to these filters</button>
+      <label id="share-link-fallback" class="share-link-fallback" hidden>
+        <span>Copy this link:</span>
+        <input id="share-link-text" type="text" readonly aria-label="Share link for the current filters">
+      </label>
       <div id="status" class="status" role="status" aria-live="polite">Loading game database…</div>
       <div id="duplicate-filter-warning" class="duplicate-filter-warning" role="alert" hidden></div>
       <button id="retry-database" class="retry-button" type="button" hidden>Reload database</button>
@@ -51,7 +55,7 @@
     </footer>
   </main>
 
-  <script type="module" src="tabulator-slim-loader.js?v=20261116-share-filters-1"></script>
+  <script type="module" src="tabulator-slim-loader.js?v=20261116-share-filters-3"></script>
 </body>
 </html>
 
