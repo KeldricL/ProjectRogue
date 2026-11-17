@@ -1430,7 +1430,7 @@ function trackSurpriseLinkClick(row, link, index) {
 
 function appendAffiliateLinkCard(parent, row, store, offer) {
   if (!offer || !/^https?:\/\//i.test(offer.url || "")) return;
-  const labels = { humble: "Humble", gmg: "GreenmanGaming" };
+  const labels = { humble: "Humble Bundle", gmg: "Greenman Gaming" };
   const label = labels[store];
   const link = {
     url: offer.url,
