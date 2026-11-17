@@ -357,7 +357,7 @@ dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing:hover { b
 .compare-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #41494d; background: #20282a; }
 .compare-dialog-header h2 { margin: 0; color: #f5f7fa; font-size: 1.25rem; }
 .compare-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 10px; max-height: calc(92vh - 65px); max-height: calc(92dvh - 65px); padding: 10px; overflow: auto; }
-.compare-game-card { min-width: 0; max-height: calc(92vh - 85px); max-height: calc(92dvh - 85px); }
+.compare-game-card { grid-area: auto; width: 100%; min-width: 0; max-height: calc(92vh - 85px); max-height: calc(92dvh - 85px); }
 .compare-game-card .surprise-card-header { padding: 10px 12px; }
 .compare-game-card .surprise-game-title { font-size: clamp(1rem, 1.5vw, 1.35rem); overflow-wrap: anywhere; }
 .compare-game-card .surprise-card-body { padding: 10px 12px 14px; }
