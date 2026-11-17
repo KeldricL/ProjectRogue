@@ -546,3 +546,25 @@ html:fullscreen .compare-card-grid { max-height: calc(94vh - 65px); max-height: 
   .compare-game-card { max-height: calc(96vh - 75px); max-height: calc(96dvh - 75px); }
   .surprise-card-actions button { flex: 1 1 auto; }
 }
+
+
+/* Keep comparison cards in their own side-by-side layout, separate from Surprise Me card placement. */
+dialog.compare-dialog > .compare-card-grid {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: stretch;
+  overflow: auto;
+}
+dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-card {
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-card {
+    flex: 0 0 260px;
+  }
+}
