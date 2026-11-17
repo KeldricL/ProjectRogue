@@ -481,3 +481,21 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .surprise-game-link { min-height: 26px; padding: 3px 8px; font-size: .8rem; }
   .surprise-thumbnail-link { max-height: 86px; }
 }
+
+@media (min-width: 1000px) {
+  html:fullscreen .page-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(36px, 5vw, 100px);
+  }
+  html:fullscreen .page-header > div:first-child { grid-column: 1; min-width: 0; }
+  html:fullscreen .header-actions {
+    grid-column: 2;
+    justify-self: center;
+    width: min(700px, 100%);
+    min-width: 0;
+    flex: initial;
+  }
+  html:fullscreen .header-button-row { padding-left: 0; }
+}
