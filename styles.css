@@ -33,6 +33,12 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .view-filtered-cards[hidden] { display: none; }
 .share-filtered-view { min-height: 34px; padding: 5px 11px; border-color: #526b88; color: #c7dcf4; white-space: nowrap; }
 .share-filtered-view[hidden] { display: none; }
+.compare-selected-games { min-height: 34px; padding: 5px 11px; border-color: #526b88; color: #c7dcf4; white-space: nowrap; }
+.compare-selected-games[hidden] { display: none; }
+.compare-selected-games:disabled { opacity: .62; cursor: not-allowed; }
+.want-to-play-filter { min-height: 34px; padding: 5px 11px; border-color: #806a3c; color: #f1d79a; white-space: nowrap; }
+.want-to-play-filter[hidden] { display: none; }
+.want-to-play-filter[aria-pressed="true"] { border-color: #d0ae58; background: #4a3d22; color: #fff0bd; }
 .share-link-fallback { display: flex; flex: 1 1 100%; align-items: center; gap: 8px; color: #c7dcf4; font-size: .84rem; }
 .share-link-fallback[hidden] { display: none; }
 .share-link-fallback input { flex: 1 1 auto; width: min(100%, 720px); min-width: 0; min-height: 34px; padding: 6px 9px; border: 1px solid #526b88; border-radius: 6px; background: #171c1e; color: #eef2f4; font: inherit; font-size: .78rem; }
@@ -299,6 +305,14 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-game-note[hidden] { display: none; }
 .surprise-close { flex: 0 0 auto; width: 38px; min-height: 38px; padding: 0; font-size: 1.6rem; line-height: 1; }
 .surprise-card-body { min-height: 0; overflow: auto; padding: 18px 20px 22px; overscroll-behavior: contain; }
+.surprise-card-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 12px; }
+.surprise-card-actions button { min-height: 32px; padding: 5px 10px; font-size: .82rem; }
+.surprise-favorite-button { border-color: #806a3c; color: #f1d79a; }
+.surprise-favorite-button[aria-pressed="true"] { border-color: #d0ae58; background: #4a3d22; color: #fff0bd; }
+.surprise-compare-button[aria-pressed="true"] { border-color: #6f8bb5; background: #27364a; color: #d3e3ff; }
+.surprise-share-button { border-color: #526b88; color: #c7dcf4; }
+.surprise-share-link { width: 100%; min-height: 34px; margin: -5px 0 12px; padding: 6px 9px; border: 1px solid #526b88; border-radius: 6px; background: #171c1e; color: #eef2f4; font: inherit; font-size: .8rem; }
+.surprise-share-link[hidden] { display: none; }
 .surprise-primary-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 16px; }
 .surprise-primary-fact { min-width: 0; padding: 7px 12px; border: 1px solid #3e4a4c; border-radius: 8px; background: #252d30; }
 .surprise-field-label, .surprise-detail-label { display: block; margin-bottom: 4px; color: #aebbb7; font-size: .77rem; font-weight: 700; letter-spacing: .025em; }
@@ -338,6 +352,24 @@ dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing:hover { b
 .surprise-thumbnail-link img { display: block; width: 100%; height: 100%; padding: 2px; object-fit: contain; }
 .surprise-thumbnail-link.thumbnail-unavailable { font-size: .82rem; font-weight: 700; }
 .surprise-no-links { margin: 0; color: #aeb8bf; }
+.compare-dialog { width: min(1500px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: 92vh; max-height: 92dvh; padding: 0; overflow: hidden; border: 1px solid #53605b; border-radius: 12px; background: #1c2225; color: #e8edf5; box-shadow: 0 14px 42px #000b; }
+.compare-dialog::backdrop { background: #080b0dcc; backdrop-filter: blur(4px); }
+.compare-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #41494d; background: #20282a; }
+.compare-dialog-header h2 { margin: 0; color: #f5f7fa; font-size: 1.25rem; }
+.compare-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 10px; max-height: calc(92vh - 65px); max-height: calc(92dvh - 65px); padding: 10px; overflow: auto; }
+.compare-game-card { min-width: 0; max-height: calc(92vh - 85px); max-height: calc(92dvh - 85px); }
+.compare-game-card .surprise-card-header { padding: 10px 12px; }
+.compare-game-card .surprise-game-title { font-size: clamp(1rem, 1.5vw, 1.35rem); overflow-wrap: anywhere; }
+.compare-game-card .surprise-card-body { padding: 10px 12px 14px; }
+.compare-game-card .surprise-primary-fields { grid-template-columns: 1fr; gap: 5px; margin-bottom: 10px; }
+.compare-game-card .surprise-primary-fact { padding: 5px 8px; }
+.compare-game-card .surprise-tag-columns { gap: 8px; }
+.compare-game-card .surprise-tag-column { gap: 8px; }
+.compare-game-card .surprise-detail-grid { grid-template-columns: 1fr; gap: 5px; }
+.compare-game-card .surprise-link-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.compare-game-card .surprise-link-card { width: auto; gap: 5px; }
+.compare-game-card .surprise-thumbnail-link { height: auto; aspect-ratio: 16 / 9; }
+.compare-remove-game { flex: 0 0 auto; min-height: 30px; padding: 4px 8px; font-size: .78rem; }
 .surprise-dialog[open] { display: block; }
 .surprise-primary-fields[hidden], .surprise-tags[hidden], .surprise-details[hidden] { display: none; }
 
@@ -498,4 +530,19 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
     flex: initial;
   }
   html:fullscreen .header-button-row { padding-left: 0; }
+}
+
+@media (max-width: 900px) {
+  .compare-card-grid { grid-template-columns: repeat(3, minmax(260px, 1fr)); overflow-x: auto; }
+}
+
+html:fullscreen .compare-dialog { width: min(2200px, 96vw); max-width: 96vw; max-height: 94vh; max-height: 94dvh; }
+html:fullscreen .compare-card-grid { max-height: calc(94vh - 65px); max-height: calc(94dvh - 65px); }
+
+@media (max-width: 600px) {
+  .compare-dialog { width: calc(100vw - 12px); max-width: calc(100vw - 12px); max-height: 96vh; max-height: 96dvh; }
+  .compare-dialog-header { padding: 9px 11px; }
+  .compare-card-grid { grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 8px; max-height: calc(96vh - 56px); max-height: calc(96dvh - 56px); padding: 7px; }
+  .compare-game-card { max-height: calc(96vh - 75px); max-height: calc(96dvh - 75px); }
+  .surprise-card-actions button { flex: 1 1 auto; }
 }
