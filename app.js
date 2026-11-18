@@ -345,7 +345,7 @@ function gameNameFormatter(cell) {
   name.setAttribute("role", "button");
   name.setAttribute("tabindex", "0");
   name.setAttribute("aria-label", "View game card for " + gameName);
-  name.title = "Click to view this game's card";
+  name.title = note || "Click to view this game's card";
   name.addEventListener("click", function (event) {
     event.preventDefault();
     event.stopPropagation();
@@ -365,8 +365,8 @@ function gameNameFormatter(cell) {
   const indicator = document.createElement("span");
   indicator.className = "game-note-indicator";
   indicator.textContent = "i";
-  indicator.title = "This game has a note. Hover to read it.";
-  indicator.setAttribute("aria-label", "This game has a note. Hover to read it.");
+  indicator.title = note;
+  indicator.setAttribute("aria-label", "Game note: " + note);
 
   wrapper.append(name, indicator);
   return wrapper;
@@ -832,17 +832,6 @@ function normalizeResponse(payload) {
             ? function (cell) { return formatMultiplayerSummary(cell.getValue()); }
             : textFormatter)),
     };
-
-    if (index === 0) {
-      definition.tooltip = function (_event, cell) {
-        const note = String(cell.getRow().getData().note0 || "").trim();
-        if (!note) return false;
-        const tooltip = document.createElement("div");
-        tooltip.className = "game-note-tooltip-content";
-        tooltip.textContent = note;
-        return tooltip;
-      };
-    }
 
     if (index === 1) {
       definition.sorter = function (a, b, aRow, bRow) {
