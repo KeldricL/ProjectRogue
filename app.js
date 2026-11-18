@@ -2,10 +2,18 @@
 
 // This endpoint reads the Master worksheet and returns JSONP for the GitHub Pages site.
 const API_URL = "https://script.google.com/macros/s/AKfycbw_-kRO0YgDvL3n4VQ3xtepP4AZUzVcLoKX7uZc_CS5rMwfihPdWeNZ5QM2PloVx7Jt/exec";
+const SUBMISSION_FORM_URL = "https://forms.gle/Gk2MqGEVbinivR898";
 const LINK_COLUMNS = new Set([1, 2]); // B and C only (zero-based indexes)
 const GEMSTATION_TRIGGER = "##gemstation";
-const GEMSTATION_DATE_FIELD = "c46"; // AU, zero-based column index
+const GEMSTATION_DATE_FIELD = "c48"; // AW, zero-based column index
+const FREE_TO_PLAY_FIELD = "c42"; // AQ, zero-based column index
+const STEAM_DECK_STATUS_FIELD = "c43"; // AR, zero-based column index
+const FAVORITES_STORAGE_KEY = "keldric-gaming-want-to-play-v1";
 const GEMSTATION_VISIBLE_FIELDS = new Set(["c0", "c2", "c3", "c4", "c6", "c42", "c43", GEMSTATION_DATE_FIELD]);
+const UNORDERED_FILTER_GROUPS = [
+  { name: "Game Type", fields: ["c6", "c7", "c8"] }, // G-I
+  { name: "Theme", fields: ["c10", "c11"] }, // K-L
+];
 const COMPARISON_FILTER_OPTIONS = [
   { abbreviation: "Atomicrops-like", phrase: "Atomicrops" },
   { abbreviation: "Brotato-Like", phrase: "Brotato" },
@@ -24,6 +32,7 @@ const COMPARISON_FILTER_OPTIONS = [
   { abbreviation: "Ziggurat-Like", phrase: "Ziggurat" },
 ];
 const statusElement = document.getElementById("status");
+const duplicateFilterWarningElement = document.getElementById("duplicate-filter-warning");
 const countElement = document.getElementById("record-count");
 const searchElement = document.getElementById("global-search");
 const clearButton = document.getElementById("clear-filters");
@@ -42,16 +51,36 @@ let databaseControlsBound = false;
 let databaseRows = [];
 let hiddenColumnFields = loadHiddenColumns();
 let gemstationModeActive = false;
+let freeGamesModeActive = false;
+let steamDeckVerifiedModeActive = false;
+let wantToPlayModeActive = false;
+let favoriteGameKeys = loadFavoriteGameKeys();
+let selectedCompareRows = [];
 let columnPickerToggleButton = null;
 let columnPickerMenu = null;
 let comparisonFilterSelect = null;
 let comparisonFilterField = "";
+let filteredCardsButton = document.getElementById("view-filtered-cards");
+let compareSelectedButton = document.getElementById("compare-selected-games");
+let clearCompareButton = document.getElementById("clear-compare-selection");
+let wantToPlayFilterButton = document.getElementById("want-to-play-filter");
+let freeGamesButton = null;
+let steamDeckVerifiedButton = null;
 let surpriseDialogParts = null;
+let cardBrowseMode = "surprise";
+let filteredCardRows = [];
+let filteredCardIndex = -1;
 let surpriseEligibleRows = [];
 let surpriseHistory = [];
 let surpriseHistoryIndex = -1;
 let surpriseDefinitions = new Map();
 let surpriseDefinitionsPromise = null;
+let compareDialogParts = null;
+let shareFilteredViewButton = document.getElementById("share-filtered-view");
+let shareLinkFallback = document.getElementById("share-link-fallback");
+let shareLinkText = document.getElementById("share-link-text");
+let sharedViewRestored = false;
+let sharedGameRestored = false;
 let syncColumnPickerCheckboxes = function () {};
 const columnFilterStates = new Map();
 const columnFilterControls = new Map();
@@ -71,6 +100,28 @@ function loadHiddenColumns() {
   }
 }
 
+function favoriteKeyForGame(row) {
+  return cleanGameValue(row && row.c0).normalize("NFKC").toLocaleLowerCase();
+}
+
+function loadFavoriteGameKeys() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(FAVORITES_STORAGE_KEY) || "[]");
+    if (!Array.isArray(stored)) return new Set();
+    return new Set(stored.filter(function (key) { return typeof key === "string" && key.trim(); }));
+  } catch (_error) {
+    return new Set();
+  }
+}
+
+function saveFavoriteGameKeys() {
+  try {
+    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(favoriteGameKeys)));
+  } catch (_error) {
+    setStatus("Want to play could not be saved in this browser.", true);
+  }
+}
+
 function saveHiddenColumns() {
   try {
     window.localStorage.setItem(COLUMN_PREFERENCES_KEY, JSON.stringify(Array.from(hiddenColumnFields)));
@@ -82,6 +133,39 @@ function saveHiddenColumns() {
 function setStatus(message, isError) {
   statusElement.textContent = message;
   statusElement.classList.toggle("error", Boolean(isError));
+}
+
+function updateDuplicateFilterWarning() {
+  if (!duplicateFilterWarningElement) return;
+
+  const warnings = [];
+
+  UNORDERED_FILTER_GROUPS.forEach(function (group) {
+    const selectedByValue = new Map();
+    const duplicates = new Set();
+
+    group.fields.forEach(function (field) {
+      const state = columnFilterStates.get(field);
+      if (!state || !Array.isArray(state.selectedValues)) return;
+
+      state.selectedValues.forEach(function (value) {
+        const label = String(value == null ? "" : value).trim();
+        if (!label) return;
+        const key = label.toLocaleLowerCase();
+        if (selectedByValue.has(key)) duplicates.add(label);
+        else selectedByValue.set(key, field);
+      });
+    });
+
+    if (duplicates.size) {
+      warnings.push("Duplicate " + group.name + " choice" + (duplicates.size > 1 ? "s" : "") + ": " + Array.from(duplicates).join(", ") + ".");
+    }
+  });
+
+  duplicateFilterWarningElement.textContent = warnings.length
+    ? warnings.join(" ") + " Deselect duplicate answers."
+    : "";
+  duplicateFilterWarningElement.hidden = warnings.length === 0;
 }
 
 function sendUsageEvent(eventName, parameters) {
@@ -253,15 +337,30 @@ function textFormatter(cell) {
 
 function gameNameFormatter(cell) {
   const gameName = cell.getValue() == null ? "" : String(cell.getValue());
-  const note = String(cell.getRow().getData().note0 || "").trim();
-  if (!note) return makeTextElement(gameName);
+  const row = cell.getRow().getData();
+  const note = String(row.note0 || "").trim();
+  const name = document.createElement("span");
+  name.className = "game-name-card-trigger";
+  name.textContent = gameName;
+  name.setAttribute("role", "button");
+  name.setAttribute("tabindex", "0");
+  name.setAttribute("aria-label", "View game card for " + gameName);
+  name.title = "Click to view this game's card";
+  name.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    openGameCard(row);
+  });
+  name.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    openGameCard(row);
+  });
+  if (!note) return name;
 
   const wrapper = document.createElement("span");
   wrapper.className = "game-name-with-note";
-
-  const name = document.createElement("span");
-  name.className = "game-name-note-text";
-  name.textContent = gameName;
 
   const indicator = document.createElement("span");
   indicator.className = "game-note-indicator";
@@ -356,6 +455,8 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
       notesOnly: state.notesOnly,
     });
     updateChoicesButton(choicesButton, state, field);
+    updateDuplicateFilterWarning();
+    updateFilteredCardsButton();
     scheduleSearchUsage("column", field, title, function () { return input.value; });
   }
 
@@ -372,15 +473,26 @@ function createColumnHeaderFilter(cell, _onRendered, success) {
   return wrapper;
 }
 
-function combinedColumnHeaderFilter(filterValue, cellValue, rowData) {
+function combinedColumnHeaderFilter(filterValue, cellValue, rowData, field) {
   if (!filterValue) return true;
 
   const value = cellValue == null ? "" : String(cellValue);
   const query = String(filterValue.query || "").trim().toLocaleLowerCase();
   const selectedValues = Array.isArray(filterValue.selectedValues) ? filterValue.selectedValues : [];
+  const group = UNORDERED_FILTER_GROUPS.find(function (candidate) {
+    return candidate.fields.includes(field);
+  });
+  const valuesToSearch = group
+    ? group.fields.map(function (groupField) { return String(rowData[groupField] == null ? "" : rowData[groupField]); })
+    : [value];
 
-  if (query && !value.toLocaleLowerCase().includes(query)) return false;
-  if (selectedValues.length && !selectedValues.includes(value)) return false;
+  if (query && !valuesToSearch.some(function (candidate) { return candidate.toLocaleLowerCase().includes(query); })) return false;
+  if (selectedValues.length && !selectedValues.some(function (selected) {
+    const expected = String(selected == null ? "" : selected).trim().toLocaleLowerCase();
+    return valuesToSearch.some(function (candidate) {
+      return candidate.trim().toLocaleLowerCase() === expected;
+    });
+  })) return false;
   if (filterValue.notesOnly && !String(rowData && rowData.note0 || "").trim()) return false;
   return true;
 }
@@ -395,7 +507,10 @@ function getColumnValueOptions(field) {
   return Array.from(counts.entries()).map(function (entry) {
     return { value: entry[0], count: entry[1] };
   }).sort(function (a, b) {
-    return (a.value || "").localeCompare(b.value || "", undefined, { sensitivity: "base" });
+    const aIsBlank = !String(a.value || "").trim();
+    const bIsBlank = !String(b.value || "").trim();
+    if (aIsBlank !== bIsBlank) return aIsBlank ? 1 : -1;
+    return String(a.value || "").localeCompare(String(b.value || ""), undefined, { sensitivity: "base" });
   });
 }
 
@@ -616,6 +731,8 @@ function commitActiveValueMenu() {
     notesOnly: state.notesOnly,
   });
   updateChoicesButton(activeValueMenu.button, state, activeValueMenu.title);
+  updateDuplicateFilterWarning();
+  updateFilteredCardsButton();
   scheduleColumnFilterUsage(activeValueMenu.field, activeValueMenu.title, state);
 }
 
@@ -663,6 +780,8 @@ function clearColumnFilters() {
   });
   closeColumnValueMenu(false);
   if (comparisonFilterSelect) comparisonFilterSelect.value = "";
+  updateDuplicateFilterWarning();
+  updateFilteredCardsButton();
 }
 
 function normalizeResponse(payload) {
@@ -691,9 +810,11 @@ function normalizeResponse(payload) {
     const definition = {
       title: databaseHeaders[index],
       field: "c" + index,
-      visible: index === 0 || (index !== 46 && !hiddenColumnFields.has("c" + index)),
+      visible: index === 0 || (index !== 48 && !hiddenColumnFields.has("c" + index)),
       headerFilter: createColumnHeaderFilter,
-      headerFilterFunc: combinedColumnHeaderFilter,
+      headerFilterFunc: function (filterValue, cellValue, rowData) {
+        return combinedColumnHeaderFilter(filterValue, cellValue, rowData, "c" + index);
+      },
       headerFilterLiveFilter: false,
       headerSort: true,
       sorter: "string",
@@ -741,7 +862,7 @@ function normalizeResponse(payload) {
       };
     }
 
-    if (index === 46) {
+    if (index === 48) {
       definition.sorter = function (a, b) {
         const aText = a == null ? "" : String(a).trim();
         const bText = b == null ? "" : String(b).trim();
@@ -846,8 +967,12 @@ function findSurpriseCardFields() {
 
 function hasAtLeastThreeDataPoints(row) {
   let count = 0;
-  for (let index = 5; index <= 38; index += 1) {
-    const value = cleanGameValue(row["c" + index]);
+  const eligibleFields = [];
+  for (let index = 5; index <= 38; index += 1) eligibleFields.push("c" + index);
+  eligibleFields.push(FREE_TO_PLAY_FIELD, STEAM_DECK_STATUS_FIELD);
+
+  for (const field of eligibleFields) {
+    const value = cleanGameValue(row[field]);
     if (!value || NON_DATA_VALUES.has(value.toLocaleLowerCase())) continue;
     count += 1;
     if (count >= 3) return true;
@@ -930,18 +1055,54 @@ function createSurpriseDialog() {
 
   const cardHeader = document.createElement("header");
   cardHeader.className = "surprise-card-header";
+  const heading = document.createElement("div");
+  heading.className = "surprise-game-heading";
   const title = document.createElement("h2");
   title.className = "surprise-game-title";
+  const note = document.createElement("p");
+  note.className = "surprise-game-note";
+  note.hidden = true;
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.className = "surprise-close";
   closeButton.setAttribute("aria-label", "Close surprise game card");
   closeButton.textContent = "×";
   closeButton.addEventListener("click", function () { dialog.close(); });
-  cardHeader.append(title, closeButton);
+  heading.append(title, note);
+  cardHeader.append(heading, closeButton);
 
   const body = document.createElement("div");
   body.className = "surprise-card-body";
+  const actions = document.createElement("div");
+  actions.className = "surprise-card-actions";
+  const favoriteButton = document.createElement("button");
+  favoriteButton.type = "button";
+  favoriteButton.className = "surprise-favorite-button";
+  favoriteButton.addEventListener("click", function () {
+    if (surpriseDialogParts && surpriseDialogParts.currentRow) toggleWantToPlay(surpriseDialogParts.currentRow);
+  });
+  const compareButton = document.createElement("button");
+  compareButton.type = "button";
+  compareButton.className = "surprise-compare-button";
+  compareButton.addEventListener("click", function () {
+    if (surpriseDialogParts && surpriseDialogParts.currentRow) toggleCompareSelection(surpriseDialogParts.currentRow);
+  });
+  const shareButton = document.createElement("button");
+  shareButton.type = "button";
+  shareButton.className = "surprise-share-button";
+  shareButton.textContent = "Share this game card";
+  const shareInput = document.createElement("input");
+  shareInput.type = "text";
+  shareInput.className = "surprise-share-link";
+  shareInput.readOnly = true;
+  shareInput.hidden = true;
+  shareInput.setAttribute("aria-label", "Share link for this game card");
+  shareButton.addEventListener("click", function () {
+    if (surpriseDialogParts && surpriseDialogParts.currentRow) {
+      copyGameCardLink(surpriseDialogParts.currentRow, shareButton, shareInput);
+    }
+  });
+  actions.append(favoriteButton, compareButton, shareButton);
   const primary = document.createElement("section");
   primary.className = "surprise-primary-fields";
   primary.setAttribute("aria-label", "Game summary");
@@ -954,7 +1115,13 @@ function createSurpriseDialog() {
   const links = document.createElement("section");
   links.className = "surprise-links";
   links.setAttribute("aria-label", "Game links and thumbnails");
-  body.append(primary, tags, details, links);
+  const submitMissingDataLink = document.createElement("a");
+  submitMissingDataLink.className = "surprise-submit-missing";
+  submitMissingDataLink.href = SUBMISSION_FORM_URL;
+  submitMissingDataLink.target = "_blank";
+  submitMissingDataLink.rel = "noopener noreferrer";
+  submitMissingDataLink.textContent = "Submit missing data for this game!";
+  body.append(actions, shareInput, primary, tags, details, links, submitMissingDataLink);
   card.append(cardHeader, body);
 
   layout.append(previousButton, card, nextButton);
@@ -970,12 +1137,101 @@ function createSurpriseDialog() {
     nextButton: nextButton,
     body: body,
     title: title,
+    note: note,
     primary: primary,
     tags: tags,
     details: details,
     links: links,
+    favoriteButton: favoriteButton,
+    compareButton: compareButton,
+    shareButton: shareButton,
+    shareInput: shareInput,
+    currentRow: null,
   };
   return surpriseDialogParts;
+}
+
+function updateWantToPlayButton() {
+  if (!wantToPlayFilterButton) wantToPlayFilterButton = document.getElementById("want-to-play-filter");
+  if (!wantToPlayFilterButton) return;
+  const count = favoriteGameKeys.size;
+  wantToPlayFilterButton.textContent = "Want to play (" + count.toLocaleString() + ")";
+  wantToPlayFilterButton.hidden = count === 0 && !wantToPlayModeActive;
+  wantToPlayFilterButton.disabled = count === 0 && !wantToPlayModeActive;
+  wantToPlayFilterButton.setAttribute("aria-pressed", String(wantToPlayModeActive));
+}
+
+function updateCompareButton() {
+  if (!compareSelectedButton) compareSelectedButton = document.getElementById("compare-selected-games");
+  if (!clearCompareButton) clearCompareButton = document.getElementById("clear-compare-selection");
+  if (!compareSelectedButton) return;
+  const count = selectedCompareRows.length;
+  compareSelectedButton.textContent = "Compare selected (" + count + "/3)";
+  compareSelectedButton.hidden = count === 0;
+  compareSelectedButton.disabled = count < 2;
+  compareSelectedButton.title = count < 2 ? "Select at least two games to compare." : "Compare the selected games side by side.";
+  if (clearCompareButton) {
+    clearCompareButton.hidden = count === 0;
+    clearCompareButton.title = "Remove all selected games from comparison.";
+  }
+}
+
+function clearCompareSelection() {
+  if (!selectedCompareRows.length) return;
+  selectedCompareRows = [];
+  updateCompareButton();
+  if (surpriseDialogParts && surpriseDialogParts.currentRow) {
+    updateSurpriseCardActionButtons(surpriseDialogParts.currentRow);
+  }
+  if (compareDialogParts) renderCompareCards();
+  setStatus("Comparison selection cleared.", false);
+}
+function updateSurpriseCardActionButtons(row) {
+  if (!surpriseDialogParts) return;
+  const key = favoriteKeyForGame(row);
+  const favorite = favoriteGameKeys.has(key);
+  const selected = selectedCompareRows.some(function (candidate) { return favoriteKeyForGame(candidate) === key; });
+  surpriseDialogParts.favoriteButton.textContent = favorite ? "♥ Want to play" : "♡ Want to play";
+  surpriseDialogParts.favoriteButton.setAttribute("aria-pressed", String(favorite));
+  surpriseDialogParts.compareButton.textContent = selected ? "Remove from Compare" : "Add to Compare";
+  surpriseDialogParts.compareButton.setAttribute("aria-pressed", String(selected));
+  surpriseDialogParts.compareButton.disabled = !selected && selectedCompareRows.length >= 3;
+  surpriseDialogParts.currentRow = row;
+  surpriseDialogParts.shareInput.value = "";
+  surpriseDialogParts.shareInput.hidden = true;
+  surpriseDialogParts.shareButton.textContent = "Share this game card";
+}
+
+function toggleWantToPlay(row) {
+  const key = favoriteKeyForGame(row);
+  if (!key) return;
+  if (favoriteGameKeys.has(key)) favoriteGameKeys.delete(key);
+  else favoriteGameKeys.add(key);
+  saveFavoriteGameKeys();
+  updateWantToPlayButton();
+  updateSurpriseCardActionButtons(row);
+  if (wantToPlayModeActive && table) {
+    if (!favoriteGameKeys.size) {
+      wantToPlayModeActive = false;
+      if (wantToPlayFilterButton) wantToPlayFilterButton.setAttribute("aria-pressed", "false");
+      applyGlobalSearch();
+    } else {
+      table.setFilter(globalSearchFilter);
+    }
+  }
+}
+
+function toggleCompareSelection(row) {
+  const key = favoriteKeyForGame(row);
+  const index = selectedCompareRows.findIndex(function (candidate) { return favoriteKeyForGame(candidate) === key; });
+  if (index >= 0) selectedCompareRows.splice(index, 1);
+  else if (selectedCompareRows.length >= 3) {
+    setStatus("You can compare up to three games at a time. Remove one before adding another.", true);
+    return;
+  } else selectedCompareRows.push(row);
+  updateCompareButton();
+  updateSurpriseCardActionButtons(row);
+  if (compareDialogParts) renderCompareCards();
 }
 
 function appendSurpriseSectionHeading(parent, headingText) {
@@ -1031,19 +1287,29 @@ function appendSurpriseDetails(parent, row, excludedFields) {
   const yesFeatures = new Set();
   const alwaysGreenHeaders = new Set(["dlc", "achievements", "workshop"]);
   const alwaysGreenFields = new Set();
+  const freeToPlayFields = new Set();
+  const visibleDetailFields = new Set();
   databaseHeaders.forEach(function (header, index) {
     const normalizedHeader = cleanGameValue(header).replace(/[?]/g, "").toLocaleLowerCase();
     if (alwaysGreenHeaders.has(normalizedHeader)) alwaysGreenFields.add(index);
+    if (normalizedHeader === "free to play") freeToPlayFields.add(index);
+    if (normalizedHeader === "steam deck status") visibleDetailFields.add(index);
   });
 
   for (let index = 6; index < databaseHeaders.length; index += 1) {
     const isAlwaysGreenField = alwaysGreenFields.has(index);
-    if (index > 38 && !isAlwaysGreenField) continue;
+    const isFreeToPlayField = freeToPlayFields.has(index);
+    const isVisibleDetailField = visibleDetailFields.has(index);
+    if (index > 38 && !isAlwaysGreenField && !isFreeToPlayField && !isVisibleDetailField) continue;
     const field = "c" + index;
     const value = cleanGameValue(row[field]);
     if (excludedFields.has(index)) continue;
     if (cleanGameValue(databaseHeaders[index]).toLocaleLowerCase() === "multiplayer") {
       splitGameTags(value).forEach(function (mode) { yesFeatures.add(mode); });
+      continue;
+    }
+    if (isFreeToPlayField) {
+      if (/^y$/i.test(value)) yesFeatures.add(databaseHeaders[index]);
       continue;
     }
     if (isAlwaysGreenField) {
@@ -1152,15 +1418,89 @@ function getSurpriseThumbnailCandidates(link) {
   return candidates;
 }
 
+let affiliateCatalogPromise = null;
+
+function normalizeAffiliateGameName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\b(pc|windows)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function loadAffiliateCatalog() {
+  if (!affiliateCatalogPromise) {
+    affiliateCatalogPromise = fetch("affiliate-links.json?v=20261117-affiliate-thumbnails-1")
+      .then(function (response) {
+        if (!response.ok) throw new Error("Affiliate catalog unavailable");
+        return response.json();
+      })
+      .catch(function () { return {}; });
+  }
+  return affiliateCatalogPromise;
+}
+
 function trackSurpriseLinkClick(row, link, index) {
   let hostname = "";
   try { hostname = new URL(link.url).hostname; } catch (_error) {}
   sendUsageEvent("database_link_click", {
     game_name: safeAnalyticsText(row.c0, 80),
-    column_name: safeAnalyticsText(databaseHeaders[index], 60) || "Game link",
+    column_name: safeAnalyticsText(link.analyticsColumnName || databaseHeaders[index], 60) || "Game link",
     link_domain: safeAnalyticsText(hostname, 100),
     destination_url: analyticsDestinationUrl(link.url),
   });
+}
+
+function appendAffiliateLinkCard(parent, row, store, offer) {
+  if (!offer || !/^https?:\/\//i.test(offer.url || "")) return;
+  const labels = { humble: "Humble Bundle", gmg: "GreenmanGaming" };
+  const label = labels[store];
+  const link = {
+    url: offer.url,
+    kind: store,
+    analyticsColumnName: store === "humble" ? "Humble affiliate link" : "GreenmanGaming affiliate link",
+  };
+  const linkCard = document.createElement("div");
+  linkCard.className = "surprise-link-card surprise-affiliate-link-card";
+  const labelAnchor = document.createElement("a");
+  labelAnchor.href = offer.url;
+  labelAnchor.target = "_blank";
+  labelAnchor.rel = "noopener noreferrer sponsored";
+  labelAnchor.className = "surprise-game-link";
+  labelAnchor.textContent = label;
+  labelAnchor.setAttribute("aria-label", "Shop " + cleanGameValue(row.c0) + " at " + label + " (affiliate link)");
+  labelAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link); });
+  linkCard.appendChild(labelAnchor);
+
+  const thumbnailAnchor = document.createElement("a");
+  thumbnailAnchor.href = offer.url;
+  thumbnailAnchor.target = "_blank";
+  thumbnailAnchor.rel = "noopener noreferrer sponsored";
+  thumbnailAnchor.className = "surprise-thumbnail-link";
+  thumbnailAnchor.setAttribute("aria-label", "View " + cleanGameValue(row.c0) + " at " + label + " (affiliate link; opens in a new tab)");
+  thumbnailAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link); });
+  if (offer.image && /^https?:\/\//i.test(offer.image)) {
+    const image = document.createElement("img");
+    image.alt = "";
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", function () {
+      image.remove();
+      thumbnailAnchor.classList.add("thumbnail-unavailable");
+      thumbnailAnchor.textContent = label;
+    });
+    image.src = offer.image;
+    thumbnailAnchor.appendChild(image);
+  } else {
+    thumbnailAnchor.classList.add("thumbnail-unavailable");
+    thumbnailAnchor.textContent = label;
+  }
+  linkCard.appendChild(thumbnailAnchor);
+  parent.appendChild(linkCard);
 }
 
 function appendSurpriseLinks(parent, row) {
@@ -1178,68 +1518,79 @@ function appendSurpriseLinks(parent, row) {
   foundLinks.sort(function (a, b) { return order[a.kind] - order[b.kind]; });
 
   appendSurpriseSectionHeading(parent, "Links");
-  if (!foundLinks.length) {
-    const message = document.createElement("p");
-    message.className = "surprise-no-links";
-    message.textContent = "No game links are listed.";
-    parent.appendChild(message);
-    return;
-  }
-
   const linkCards = document.createElement("div");
   linkCards.className = "surprise-link-cards";
-  foundLinks.forEach(function (link) {
-    const kindLabel = { youtube: "YouTube", steam: "Steam", website: "Website", itch: "itch.io" }[link.kind];
-    const label = link.label || kindLabel;
-    const linkCard = document.createElement("div");
-    linkCard.className = "surprise-link-card";
-    const anchor = document.createElement("a");
-    anchor.href = link.url;
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    anchor.className = "surprise-game-link";
-    anchor.textContent = label;
-    anchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
-    linkCard.appendChild(anchor);
+  let noLinksMessage = null;
+  if (!foundLinks.length) {
+    noLinksMessage = document.createElement("p");
+    noLinksMessage.className = "surprise-no-links";
+    noLinksMessage.textContent = "No game links are listed.";
+    parent.appendChild(noLinksMessage);
+  } else {
+    foundLinks.forEach(function (link) {
+      const kindLabel = { youtube: "YouTube", steam: "Steam", website: "Website", itch: "itch.io" }[link.kind];
+      const label = link.label || kindLabel;
+      const linkCard = document.createElement("div");
+      linkCard.className = "surprise-link-card";
+      const anchor = document.createElement("a");
+      anchor.href = link.url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.className = "surprise-game-link";
+      anchor.textContent = label;
+      anchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
+      linkCard.appendChild(anchor);
 
-    const thumbnailAnchor = document.createElement("a");
-    thumbnailAnchor.href = link.url;
-    thumbnailAnchor.target = "_blank";
-    thumbnailAnchor.rel = "noopener noreferrer";
-    thumbnailAnchor.className = "surprise-thumbnail-link";
-    thumbnailAnchor.setAttribute("aria-label", label + " thumbnail (opens in a new tab)");
-    thumbnailAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
-    const thumbnailCandidates = getSurpriseThumbnailCandidates(link);
-    if (thumbnailCandidates.length) {
-      const image = document.createElement("img");
-      image.alt = "";
-      image.loading = "lazy";
-      let thumbnailCandidateIndex = 0;
-      image.addEventListener("error", function () {
-        thumbnailCandidateIndex += 1;
-        if (thumbnailCandidateIndex < thumbnailCandidates.length) {
-          image.src = thumbnailCandidates[thumbnailCandidateIndex];
-        } else {
-          thumbnailAnchor.classList.add("thumbnail-unavailable");
-          image.remove();
-          thumbnailAnchor.textContent = kindLabel;
-        }
-      });
-      thumbnailAnchor.appendChild(image);
-      image.src = thumbnailCandidates[0];
-    } else {
-      thumbnailAnchor.classList.add("thumbnail-unavailable");
-      thumbnailAnchor.textContent = kindLabel;
-    }
-    linkCard.appendChild(thumbnailAnchor);
-    linkCards.appendChild(linkCard);
+      const thumbnailAnchor = document.createElement("a");
+      thumbnailAnchor.href = link.url;
+      thumbnailAnchor.target = "_blank";
+      thumbnailAnchor.rel = "noopener noreferrer";
+      thumbnailAnchor.className = "surprise-thumbnail-link";
+      thumbnailAnchor.setAttribute("aria-label", label + " thumbnail (opens in a new tab)");
+      thumbnailAnchor.addEventListener("click", function () { trackSurpriseLinkClick(row, link, link.index); });
+      const thumbnailCandidates = getSurpriseThumbnailCandidates(link);
+      if (thumbnailCandidates.length) {
+        const image = document.createElement("img");
+        image.alt = "";
+        image.loading = "lazy";
+        let thumbnailCandidateIndex = 0;
+        image.addEventListener("error", function () {
+          thumbnailCandidateIndex += 1;
+          if (thumbnailCandidateIndex < thumbnailCandidates.length) {
+            image.src = thumbnailCandidates[thumbnailCandidateIndex];
+          } else {
+            thumbnailAnchor.classList.add("thumbnail-unavailable");
+            image.remove();
+            thumbnailAnchor.textContent = kindLabel;
+          }
+        });
+        thumbnailAnchor.appendChild(image);
+        image.src = thumbnailCandidates[0];
+      } else {
+        thumbnailAnchor.classList.add("thumbnail-unavailable");
+        thumbnailAnchor.textContent = kindLabel;
+      }
+      linkCard.appendChild(thumbnailAnchor);
+      linkCards.appendChild(linkCard);
+    });
+    parent.appendChild(linkCards);
+  }
+
+  loadAffiliateCatalog().then(function (catalog) {
+    const offers = catalog[normalizeAffiliateGameName(row.c0)];
+    if (!offers || (!offers.humble && !offers.gmg)) return;
+    if (noLinksMessage) noLinksMessage.remove();
+    if (!linkCards.isConnected) parent.appendChild(linkCards);
+    appendAffiliateLinkCard(linkCards, row, "humble", offers.humble);
+    appendAffiliateLinkCard(linkCards, row, "gmg", offers.gmg);
   });
-  parent.appendChild(linkCards);
 }
 
-function renderSurpriseGame(row) {
-  const parts = createSurpriseDialog();
+function populateGameCardContent(parts, row) {
   parts.title.textContent = cleanGameValue(row.c0) || "Untitled game";
+  const gameNote = String(row.note0 || "").trim();
+  parts.note.textContent = gameNote;
+  parts.note.hidden = !gameNote;
   parts.primary.replaceChildren();
   parts.tags.replaceChildren();
   parts.details.replaceChildren();
@@ -1277,22 +1628,136 @@ function renderSurpriseGame(row) {
   else parts.tags.hidden = false;
   if (!parts.details.childElementCount) parts.details.hidden = true;
   else parts.details.hidden = false;
+}
 
-  parts.previousButton.hidden = surpriseHistoryIndex <= 0;
-  parts.nextButton.hidden = false;
+function renderSurpriseGame(row) {
+  const parts = createSurpriseDialog();
+  parts.dialog.setAttribute("aria-label", cardBrowseMode === "newest" ? "Newest submitted game cards" : (cardBrowseMode === "list" ? "Game cards" : "Surprise game"));
+  populateGameCardContent(parts, row);
+  updateSurpriseCardActionButtons(row);
+
+  if (cardBrowseMode === "newest") {
+    parts.previousButton.hidden = filteredCardIndex >= filteredCardRows.length - 1;
+    parts.nextButton.hidden = filteredCardIndex <= 0;
+    parts.previousButton.title = "Older submitted game";
+    parts.nextButton.title = "Newer submitted game";
+    parts.previousButton.setAttribute("aria-label", "Older submitted game");
+    parts.nextButton.setAttribute("aria-label", "Newer submitted game");
+  } else if (cardBrowseMode === "list") {
+    parts.previousButton.hidden = filteredCardIndex <= 0;
+    parts.nextButton.hidden = filteredCardIndex >= filteredCardRows.length - 1;
+    parts.previousButton.title = "Previous matching game";
+    parts.nextButton.title = "Next matching game";
+    parts.previousButton.setAttribute("aria-label", "Previous matching game");
+    parts.nextButton.setAttribute("aria-label", "Next matching game");
+  } else {
+    parts.previousButton.hidden = surpriseHistoryIndex <= 0;
+    parts.nextButton.hidden = false;
+    parts.previousButton.title = "Previous game";
+    parts.nextButton.title = "Another random game";
+    parts.previousButton.setAttribute("aria-label", "Previous surprise game");
+    parts.nextButton.setAttribute("aria-label", "Another random game");
+  }
   if (!parts.dialog.open) parts.dialog.showModal();
   else parts.body.scrollTop = 0;
+}
+
+function createCompareDialog() {
+  if (compareDialogParts) return compareDialogParts;
+  const dialog = document.createElement("dialog");
+  dialog.className = "compare-dialog";
+  dialog.setAttribute("aria-label", "Compare selected games");
+  const header = document.createElement("header");
+  header.className = "compare-dialog-header";
+  const title = document.createElement("h2");
+  title.textContent = "Compare games";
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "surprise-close";
+  closeButton.setAttribute("aria-label", "Close comparison");
+  closeButton.textContent = "×";
+  closeButton.addEventListener("click", function () { dialog.close(); });
+  header.append(title, closeButton);
+  const grid = document.createElement("div");
+  grid.className = "compare-card-grid";
+  dialog.append(header, grid);
+  dialog.addEventListener("click", function (event) {
+    if (event.target === dialog) dialog.close();
+  });
+  document.body.appendChild(dialog);
+  compareDialogParts = { dialog: dialog, grid: grid };
+  return compareDialogParts;
+}
+
+function createComparisonCard(row) {
+  const card = document.createElement("article");
+  card.className = "surprise-card compare-game-card";
+  const header = document.createElement("header");
+  header.className = "surprise-card-header";
+  const heading = document.createElement("div");
+  heading.className = "surprise-game-heading";
+  const title = document.createElement("h3");
+  title.className = "surprise-game-title";
+  const note = document.createElement("p");
+  note.className = "surprise-game-note";
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.className = "compare-remove-game";
+  removeButton.textContent = "Remove";
+  removeButton.setAttribute("aria-label", "Remove " + cleanGameValue(row.c0) + " from comparison");
+  removeButton.addEventListener("click", function () {
+    const key = favoriteKeyForGame(row);
+    selectedCompareRows = selectedCompareRows.filter(function (candidate) { return favoriteKeyForGame(candidate) !== key; });
+    updateCompareButton();
+    updateSurpriseCardActionButtons(surpriseDialogParts && surpriseDialogParts.currentRow);
+    renderCompareCards();
+  });
+  heading.append(title, note);
+  header.append(heading, removeButton);
+  const body = document.createElement("div");
+  body.className = "surprise-card-body";
+  const parts = { title: title, note: note };
+  ["primary", "tags", "details", "links"].forEach(function (name) {
+    const section = document.createElement("section");
+    section.className = name === "primary" ? "surprise-primary-fields" : (name === "tags" ? "surprise-tags" : (name === "details" ? "surprise-details" : "surprise-links"));
+    if (name === "primary") section.setAttribute("aria-label", "Game summary");
+    if (name === "tags") section.setAttribute("aria-label", "Comparison and themes");
+    if (name === "details") section.setAttribute("aria-label", "Game details");
+    if (name === "links") section.setAttribute("aria-label", "Game links and thumbnails");
+    parts[name] = section;
+    body.appendChild(section);
+  });
+  card.append(header, body);
+  populateGameCardContent(parts, row);
+  return card;
+}
+
+function renderCompareCards() {
+  if (selectedCompareRows.length < 2) {
+    if (compareDialogParts && compareDialogParts.dialog.open) compareDialogParts.dialog.close();
+    return;
+  }
+  const parts = createCompareDialog();
+  parts.grid.replaceChildren();
+  selectedCompareRows.forEach(function (row) { parts.grid.appendChild(createComparisonCard(row)); });
+}
+
+function openSelectedComparison() {
+  if (selectedCompareRows.length < 2) return;
+  renderCompareCards();
+  const parts = createCompareDialog();
+  if (!parts.dialog.open) parts.dialog.showModal();
 }
 
 function openSurpriseMe() {
   let stage = "checking the loaded database";
   try {
     if (!table) return;
+    cardBrowseMode = "surprise";
     try { loadSurpriseDefinitions(); } catch (_error) {}
-    const activeRows = table.getData("active");
-    surpriseEligibleRows = activeRows.filter(hasAtLeastThreeDataPoints);
+    surpriseEligibleRows = databaseRows.filter(hasAtLeastThreeDataPoints);
     if (!surpriseEligibleRows.length) {
-      setStatus("No games with at least 3 data points match the current search and filters.", true);
+      setStatus("No games in the database have at least 3 meaningful data points.", true);
       return;
     }
     const selected = surpriseEligibleRows[Math.floor(Math.random() * surpriseEligibleRows.length)];
@@ -1306,7 +1771,112 @@ function openSurpriseMe() {
   }
 }
 
+function parseSubmissionTimestamp(value) {
+  const text = cleanGameValue(value);
+  if (!text) return NaN;
+
+  const usDate = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?$/i);
+  if (usDate) {
+    const month = Number(usDate[1]);
+    const day = Number(usDate[2]);
+    const year = Number(usDate[3]);
+    let hour = Number(usDate[4] || 0);
+    const minute = Number(usDate[5] || 0);
+    const second = Number(usDate[6] || 0);
+    const meridiem = String(usDate[7] || "").toLocaleUpperCase();
+    if (meridiem === "PM" && hour < 12) hour += 12;
+    if (meridiem === "AM" && hour === 12) hour = 0;
+    const parsed = new Date(year, month - 1, day, hour, minute, second);
+    if (parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day) {
+      return parsed.getTime();
+    }
+    return NaN;
+  }
+
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp) ? timestamp : NaN;
+}
+
+function openNewestGame() {
+  if (!table) return;
+  if (!table.getColumn(GEMSTATION_DATE_FIELD)) {
+    setStatus("Newest Games needs the database feed to include the hidden AW submission-date column.", true);
+    return;
+  }
+
+  const datedRows = table.getData().map(function (row) {
+    return { row: row, timestamp: parseSubmissionTimestamp(row[GEMSTATION_DATE_FIELD]) };
+  }).filter(function (item) {
+    return Number.isFinite(item.timestamp);
+  }).sort(function (a, b) {
+    return b.timestamp - a.timestamp;
+  });
+
+  if (!datedRows.length) {
+    setStatus("No games with a valid AW submission date are available.", true);
+    return;
+  }
+
+  try { loadSurpriseDefinitions(); } catch (_error) {}
+  cardBrowseMode = "newest";
+  filteredCardRows = datedRows.map(function (item) { return item.row; });
+  filteredCardIndex = 0;
+  renderSurpriseGame(filteredCardRows[filteredCardIndex]);
+}
+
+function openGameCard(row) {
+  if (!table || !row) return;
+  try {
+    try { loadSurpriseDefinitions(); } catch (_error) {}
+    filteredCardRows = table.getData("active");
+    filteredCardIndex = filteredCardRows.findIndex(function (candidate) {
+      return candidate === row;
+    });
+    if (filteredCardIndex < 0) {
+      const gameName = cleanGameValue(row.c0);
+      filteredCardIndex = filteredCardRows.findIndex(function (candidate) {
+        return cleanGameValue(candidate.c0) === gameName;
+      });
+    }
+    cardBrowseMode = "list";
+    renderSurpriseGame(row);
+  } catch (error) {
+    console.error("Game card could not open:", error);
+    setStatus("The game card could not open. Please try again.", true);
+  }
+}
+
+function openFilteredCards() {
+  if (!table || !hasActiveUserFilters()) return;
+  const activeRows = table.getData("active");
+  if (!activeRows.length) {
+    setStatus("No games match the current search and filters.", true);
+    return;
+  }
+  try { loadSurpriseDefinitions(); } catch (_error) {}
+  cardBrowseMode = "list";
+  filteredCardRows = activeRows;
+  filteredCardIndex = 0;
+  renderSurpriseGame(filteredCardRows[filteredCardIndex]);
+}
+
 function moveSurpriseHistory(direction) {
+  if (cardBrowseMode === "newest") {
+    const nextIndex = filteredCardIndex + (direction < 0 ? 1 : -1);
+    if (nextIndex < 0 || nextIndex >= filteredCardRows.length) return;
+    filteredCardIndex = nextIndex;
+    renderSurpriseGame(filteredCardRows[filteredCardIndex]);
+    return;
+  }
+
+  if (cardBrowseMode === "list") {
+    const nextIndex = filteredCardIndex + direction;
+    if (nextIndex < 0 || nextIndex >= filteredCardRows.length) return;
+    filteredCardIndex = nextIndex;
+    renderSurpriseGame(filteredCardRows[filteredCardIndex]);
+    return;
+  }
+
   if (direction < 0) {
     if (surpriseHistoryIndex <= 0) return;
     surpriseHistoryIndex -= 1;
@@ -1331,6 +1901,9 @@ function moveSurpriseHistory(direction) {
 }
 
 function globalSearchFilter(rowData) {
+  if (freeGamesModeActive && String(rowData[FREE_TO_PLAY_FIELD] || "").trim().toLocaleUpperCase() !== "Y") return false;
+  if (steamDeckVerifiedModeActive && String(rowData[STEAM_DECK_STATUS_FIELD] || "").trim().toLocaleLowerCase() !== "verified") return false;
+  if (wantToPlayModeActive && !favoriteGameKeys.has(favoriteKeyForGame(rowData))) return false;
   const query = searchElement.value.trim().toLocaleLowerCase();
   if (!query) return true;
 
@@ -1344,22 +1917,27 @@ function globalSearchFilter(rowData) {
 }
 
 function applyGlobalSearch() {
-  if (!table) return;
+  if (!table) {
+    updateFilteredCardsButton();
+    return;
+  }
   if (searchElement.value.trim().toLocaleLowerCase() === GEMSTATION_TRIGGER) {
     enterGemstationMode();
+    updateFilteredCardsButton();
     return;
   }
   if (gemstationModeActive) leaveGemstationMode();
 
-  if (searchElement.value.trim() === "") {
-    table.clearFilter(); // Keeps the individual column header filters.
-  } else {
+  if (freeGamesModeActive || steamDeckVerifiedModeActive || wantToPlayModeActive || searchElement.value.trim() !== "") {
     table.setFilter(globalSearchFilter);
+  } else {
+    table.clearFilter(); // Keeps the individual column header filters.
   }
+  updateFilteredCardsButton();
 }
 
 function hasActiveUserFilters() {
-  if (gemstationModeActive || searchElement.value.trim()) return true;
+  if (gemstationModeActive || freeGamesModeActive || steamDeckVerifiedModeActive || wantToPlayModeActive || searchElement.value.trim()) return true;
   return Array.from(columnFilterStates.values()).some(function (state) {
     return Boolean(
       String(state.query || "").trim() ||
@@ -1369,14 +1947,190 @@ function hasActiveUserFilters() {
   });
 }
 
+function encodeSharedView(state) {
+  const bytes = new TextEncoder().encode(JSON.stringify(state));
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function decodeSharedView(encoded) {
+  const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - base64.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function createSharedViewState() {
+  const filters = {};
+  columnFilterStates.forEach(function (state, field) {
+    const query = String(state.query || "");
+    const selectedValues = Array.isArray(state.selectedValues) ? state.selectedValues : [];
+    if (query.trim() || selectedValues.length || state.notesOnly) {
+      filters[field] = { q: query, v: selectedValues, n: Boolean(state.notesOnly) };
+    }
+  });
+  return {
+    v: 1,
+    q: searchElement.value,
+    mode: freeGamesModeActive ? "free" : (steamDeckVerifiedModeActive ? "verified" : ""),
+    filters: filters,
+  };
+}
+
+function getShareBaseUrl() {
+  const currentFrameUrl = new URL(window.location.href);
+  const shareBase = currentFrameUrl.searchParams.get("shareBase");
+  return shareBase ? new URL(shareBase) : currentFrameUrl;
+}
+
+async function copyFilteredViewLink() {
+  if (!shareFilteredViewButton) return;
+  const url = getShareBaseUrl();
+  url.searchParams.delete("pr");
+  url.searchParams.set("pr", encodeSharedView(createSharedViewState()));
+  const shareUrl = url.toString();
+  if (shareUrl.length > 2000) {
+    setStatus("This filter combination makes a long link. Narrow the selections, then copy the link again.", true);
+    return;
+  }
+
+  let copiedToClipboard = false;
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    copiedToClipboard = true;
+  } catch (_error) {
+    if (!shareLinkFallback) shareLinkFallback = document.getElementById("share-link-fallback");
+    if (!shareLinkText) shareLinkText = document.getElementById("share-link-text");
+    if (shareLinkFallback && shareLinkText) {
+      shareLinkText.value = shareUrl;
+      shareLinkFallback.hidden = false;
+      shareLinkText.focus();
+      shareLinkText.select();
+      setStatus("Clipboard access is blocked in this embed. The link is selected below; press Ctrl+C to copy it.", true);
+    }
+  }
+  const originalText = "Copy link to these filters";
+  shareFilteredViewButton.textContent = copiedToClipboard ? "Link copied!" : "Copy link manually below";
+  window.setTimeout(function () {
+    if (shareFilteredViewButton && copiedToClipboard) shareFilteredViewButton.textContent = originalText;
+  }, 1800);
+}
+
+async function copyGameCardLink(row, button, input) {
+  const url = getShareBaseUrl();
+  url.searchParams.delete("pr");
+  url.searchParams.set("game", cleanGameValue(row.c0));
+  const shareUrl = url.toString();
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    button.textContent = "Link copied!";
+    window.setTimeout(function () { button.textContent = "Share this game card"; }, 1800);
+  } catch (_error) {
+    input.value = shareUrl;
+    input.hidden = false;
+    input.focus();
+    input.select();
+    button.textContent = "Copy the selected link";
+    setStatus("Clipboard access is blocked in this embed. The game link is selected; press Ctrl+C to copy it.", true);
+  }
+}
+
+function openSharedGameCardFromUrl() {
+  if (sharedGameRestored || !table) return;
+  sharedGameRestored = true;
+  const gameName = new URL(window.location.href).searchParams.get("game");
+  if (!gameName) return;
+  const key = gameName.normalize("NFKC").trim().toLocaleLowerCase();
+  const row = databaseRows.find(function (candidate) {
+    return favoriteKeyForGame(candidate) === key;
+  });
+  if (!row) {
+    setStatus("That game card could not be found in the current database.", true);
+    return;
+  }
+  try { loadSurpriseDefinitions(); } catch (_error) {}
+  cardBrowseMode = "list";
+  filteredCardRows = databaseRows.slice();
+  filteredCardIndex = filteredCardRows.indexOf(row);
+  renderSurpriseGame(row);
+}
+
+function restoreSharedView() {
+  if (sharedViewRestored) return;
+  sharedViewRestored = true;
+  const encoded = new URL(window.location.href).searchParams.get("pr");
+  if (!encoded || encoded.length > 12000) return;
+
+  let sharedView;
+  try {
+    sharedView = decodeSharedView(encoded);
+  } catch (_error) {
+    setStatus("The shared filter link could not be read. Clear the link parameter and try again.", true);
+    return;
+  }
+  if (!sharedView || sharedView.v !== 1 || typeof sharedView !== "object") return;
+
+  searchElement.value = typeof sharedView.q === "string" ? sharedView.q.slice(0, 500) : "";
+  const mode = sharedView.mode === "free" || sharedView.mode === "verified" ? sharedView.mode : "";
+  freeGamesModeActive = mode === "free";
+  steamDeckVerifiedModeActive = mode === "verified";
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", String(freeGamesModeActive));
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", String(steamDeckVerifiedModeActive));
+
+  const filters = sharedView.filters && typeof sharedView.filters === "object" ? sharedView.filters : {};
+  Object.keys(filters).forEach(function (field) {
+    if (!/^c\d+$/.test(field) || Number(field.slice(1)) >= databaseHeaders.length) return;
+    const saved = filters[field];
+    if (!saved || typeof saved !== "object") return;
+    const state = getColumnFilterState(field);
+    state.query = typeof saved.q === "string" ? saved.q.slice(0, 500) : "";
+    state.selectedValues = Array.isArray(saved.v)
+      ? saved.v.filter(function (value) { return typeof value === "string"; }).slice(0, 300)
+      : [];
+    state.notesOnly = Boolean(saved.n);
+    const control = columnFilterControls.get(field);
+    if (control) {
+      control.input.value = state.query;
+      control.success({ query: state.query, selectedValues: state.selectedValues.slice(), notesOnly: state.notesOnly });
+      updateChoicesButton(control.button, state, field);
+    }
+    if (field === comparisonFilterField && comparisonFilterSelect) {
+      const match = COMPARISON_FILTER_OPTIONS.find(function (option) {
+        return option.abbreviation.toLocaleLowerCase() === state.query.trim().toLocaleLowerCase();
+      });
+      comparisonFilterSelect.value = match ? match.abbreviation : "";
+    }
+  });
+  updateDuplicateFilterWarning();
+  updateFilteredCardsButton();
+}
+
+function updateFilteredCardsButton() {
+  if (!filteredCardsButton) filteredCardsButton = document.getElementById("view-filtered-cards");
+  if (filteredCardsButton) filteredCardsButton.hidden = !hasActiveUserFilters();
+  if (!shareFilteredViewButton) shareFilteredViewButton = document.getElementById("share-filtered-view");
+  if (shareFilteredViewButton) shareFilteredViewButton.hidden = !hasActiveUserFilters() || gemstationModeActive || wantToPlayModeActive;
+  if (!shareLinkFallback) shareLinkFallback = document.getElementById("share-link-fallback");
+  if (shareLinkFallback && (!hasActiveUserFilters() || gemstationModeActive)) shareLinkFallback.hidden = true;
+}
+
 function enterGemstationMode() {
   if (!table || gemstationModeActive) return;
   if (!table.getColumn(GEMSTATION_DATE_FIELD)) {
-    setStatus("The Gemstation view needs the database feed to include Master columns through AU.", true);
+    setStatus("The Gemstation view needs the database feed to include Master columns through AW.", true);
     return;
   }
 
   gemstationModeActive = true;
+  freeGamesModeActive = false;
+  steamDeckVerifiedModeActive = false;
+  wantToPlayModeActive = false;
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
+  updateWantToPlayButton();
   clearColumnFilters();
   table.clearFilter(true);
   table.getColumns().forEach(function (column) {
@@ -1395,6 +2149,7 @@ function enterGemstationMode() {
   });
   table.setSort(GEMSTATION_DATE_FIELD, "desc");
   setStatus("Gemstation view: submitted games, newest first.", false);
+  updateFilteredCardsButton();
 }
 
 function leaveGemstationMode() {
@@ -1413,10 +2168,115 @@ function leaveGemstationMode() {
   syncColumnPickerCheckboxes();
 
   const query = searchElement.value.trim();
-  if (query) table.setFilter(globalSearchFilter);
+  if (query || freeGamesModeActive || steamDeckVerifiedModeActive || wantToPlayModeActive) table.setFilter(globalSearchFilter);
   else table.clearFilter();
+  updateFilteredCardsButton();
   const count = Number(countElement.textContent.replace(/[^0-9]/g, ""));
   setStatus("Loaded " + (Number.isFinite(count) ? count.toLocaleString() : databaseRows.length.toLocaleString()) + " games from the Master worksheet.", false);
+}
+
+function enterFreeGamesMode() {
+  if (!table) return;
+  if (!table.getColumn(FREE_TO_PLAY_FIELD)) {
+    setStatus("Free Games needs the database feed to include the AQ Free To Play column.", true);
+    return;
+  }
+  if (freeGamesModeActive) {
+    freeGamesModeActive = false;
+    if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+    applyGlobalSearch();
+    setStatus("Free Games filter cleared.", false);
+    return;
+  }
+  if (gemstationModeActive) {
+    searchElement.value = "";
+    leaveGemstationMode();
+  }
+
+  searchElement.value = "";
+  clearColumnFilters();
+  table.clearFilter(true);
+  steamDeckVerifiedModeActive = false;
+  wantToPlayModeActive = false;
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
+  updateWantToPlayButton();
+  freeGamesModeActive = true;
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "true");
+  table.setFilter(globalSearchFilter);
+  setStatus("Free Games: showing games marked Y in Free To Play.", false);
+  updateFilteredCardsButton();
+}
+
+function enterSteamDeckVerifiedMode() {
+  if (!table) return;
+  if (!table.getColumn(STEAM_DECK_STATUS_FIELD)) {
+    setStatus("Steam Deck Verified needs the database feed to include column AR, Steam Deck Status.", true);
+    return;
+  }
+  if (steamDeckVerifiedModeActive) {
+    steamDeckVerifiedModeActive = false;
+    if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
+    applyGlobalSearch();
+    setStatus("Steam Deck Verified filter cleared.", false);
+    return;
+  }
+
+  if (gemstationModeActive) {
+    searchElement.value = "";
+    leaveGemstationMode();
+  }
+
+  searchElement.value = "";
+  clearColumnFilters();
+  table.clearFilter(true);
+  freeGamesModeActive = false;
+  wantToPlayModeActive = false;
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+  updateWantToPlayButton();
+  steamDeckVerifiedModeActive = true;
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "true");
+  table.setFilter(globalSearchFilter);
+  setStatus('Steam Deck Verified: showing games marked "Verified".', false);
+  sendUsageEvent("database_filter", {
+    column_name: "Steam Deck Status",
+    filter_type: "button",
+    selected_value_count: 1,
+    selected_values: "Verified",
+    notes_only: false,
+    result_count: activeResultCount(),
+  });
+  updateFilteredCardsButton();
+}
+
+function enterWantToPlayMode() {
+  if (!table) return;
+  if (wantToPlayModeActive) {
+    wantToPlayModeActive = false;
+    updateWantToPlayButton();
+    applyGlobalSearch();
+    setStatus("Want to play filter cleared.", false);
+    return;
+  }
+  if (!favoriteGameKeys.size) {
+    setStatus("Save games to Want to play from their game cards first.", false);
+    return;
+  }
+  if (gemstationModeActive) {
+    searchElement.value = "";
+    leaveGemstationMode();
+  }
+  searchElement.value = "";
+  clearColumnFilters();
+  table.clearFilter(true);
+  freeGamesModeActive = false;
+  steamDeckVerifiedModeActive = false;
+  if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+  if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
+  wantToPlayModeActive = true;
+  updateWantToPlayButton();
+  table.setFilter(globalSearchFilter);
+  setStatus("Want to play: showing games saved in this browser.", false);
+  updateFilteredCardsButton();
 }
 
 async function toggleFullscreen() {
@@ -1455,14 +2315,9 @@ function addColumnPicker(columns) {
   actionRow.className = "header-button-row";
   const surpriseControlsRow = document.createElement("div");
   surpriseControlsRow.className = "header-button-row surprise-controls-row";
-  if (fullscreenButton && fullscreenButton.parentElement === headerActions) {
-    headerActions.insertBefore(actionRow, fullscreenButton);
-    headerActions.insertBefore(surpriseControlsRow, fullscreenButton);
-    surpriseControlsRow.appendChild(fullscreenButton);
-  } else {
-    headerActions.append(actionRow, surpriseControlsRow);
-    if (fullscreenButton) surpriseControlsRow.appendChild(fullscreenButton);
-  }
+  const steamDeckVerifiedRow = document.createElement("div");
+  steamDeckVerifiedRow.className = "header-button-row steam-deck-verified-row";
+  headerActions.append(actionRow, surpriseControlsRow, steamDeckVerifiedRow);
 
   const toggleButton = document.createElement("button");
   toggleButton.id = "column-picker-toggle";
@@ -1478,6 +2333,40 @@ function addColumnPicker(columns) {
   surpriseButton.textContent = "Surprise me";
   surpriseButton.setAttribute("aria-label", "Show a random game matching the current filters");
   surpriseButton.addEventListener("click", openSurpriseMe);
+
+  const newestButton = document.createElement("button");
+  newestButton.id = "newest-game-button";
+  newestButton.type = "button";
+  newestButton.textContent = "NEWEST GAMES";
+  newestButton.setAttribute("aria-label", "Show the most recently submitted game and browse older submissions");
+  newestButton.addEventListener("click", openNewestGame);
+
+  const freeButton = document.createElement("button");
+  freeButton.id = "free-games-button";
+  freeButton.className = "free-games-button";
+  freeButton.type = "button";
+  freeButton.textContent = "FREE GAMES";
+  freeButton.title = "Filter the database to games marked Y in the Free To Play column";
+  freeButton.setAttribute("aria-label", "Show games marked Y in the Free To Play column");
+  freeButton.setAttribute("aria-pressed", "false");
+  freeButton.addEventListener("click", enterFreeGamesMode);
+  freeGamesButton = freeButton;
+
+  const steamDeckVerified = document.createElement("button");
+  steamDeckVerified.id = "steam-deck-verified-button";
+  steamDeckVerified.type = "button";
+  steamDeckVerified.textContent = "Steam Deck Verified";
+  steamDeckVerified.title = 'Filter games to Steam Deck Status "Verified"';
+  steamDeckVerified.setAttribute("aria-label", 'Show games with Steam Deck Status "Verified"');
+  steamDeckVerified.setAttribute("aria-pressed", "false");
+  steamDeckVerified.addEventListener("click", enterSteamDeckVerifiedMode);
+  steamDeckVerifiedButton = steamDeckVerified;
+
+  if (!filteredCardsButton) filteredCardsButton = document.getElementById("view-filtered-cards");
+  if (filteredCardsButton && filteredCardsButton.dataset.clickBound !== "true") {
+    filteredCardsButton.addEventListener("click", openFilteredCards);
+    filteredCardsButton.dataset.clickBound = "true";
+  }
 
   const comparisonSelect = document.createElement("select");
   comparisonSelect.id = "comparison-game-filter";
@@ -1497,7 +2386,8 @@ function addColumnPicker(columns) {
   comparisonSelect.disabled = !comparisonFilterField;
   if (!comparisonFilterField) comparisonSelect.title = "The database feed does not include a Comparison column.";
   actionRow.append(comparisonSelect, toggleButton);
-  surpriseControlsRow.append(surpriseButton, fullscreenButton);
+  surpriseControlsRow.append(surpriseButton, newestButton, freeButton);
+  steamDeckVerifiedRow.appendChild(steamDeckVerified);
 
   comparisonSelect.addEventListener("change", function () {
     if (!comparisonFilterField) return;
@@ -1514,6 +2404,7 @@ function addColumnPicker(columns) {
       notesOnly: false,
     });
     updateChoicesButton(control.button, state, comparisonFilterField);
+    updateFilteredCardsButton();
     scheduleSearchUsage("column", comparisonFilterField, "Comparison", function () {
       return state.query;
     });
@@ -1647,6 +2538,49 @@ function addColumnPicker(columns) {
   });
 }
 
+function addColumnHideButtons() {
+  if (!table) return;
+
+  databaseHeaders.forEach(function (title, index) {
+    const field = "c" + index;
+    if (index === 0 || field === GEMSTATION_DATE_FIELD) return;
+
+    const column = table.getColumn(field);
+    const columnElement = column && column.getElement();
+    if (!columnElement || columnElement.querySelector(".column-hide-button")) return;
+
+    const sorter = columnElement.querySelector(".tabulator-col-sorter");
+    if (!sorter) return;
+
+    columnElement.classList.add("has-column-hide-button");
+    const hideButton = document.createElement("button");
+    hideButton.type = "button";
+    hideButton.className = "column-hide-button";
+    hideButton.textContent = "×";
+    hideButton.title = "Hide " + title + " column";
+    hideButton.setAttribute("aria-label", "Hide " + title + " column");
+    ["pointerdown", "mousedown", "touchstart"].forEach(function (eventName) {
+      hideButton.addEventListener(eventName, function (event) {
+        event.stopPropagation();
+      });
+    });
+    hideButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!table || !table.getColumn(field)) return;
+      table.getColumn(field).hide();
+      hiddenColumnFields.add(field);
+      saveHiddenColumns();
+      if (typeof syncColumnPickerCheckboxes === "function") syncColumnPickerCheckboxes();
+      window.requestAnimationFrame(function () {
+        table.redraw(true);
+      });
+    });
+    sorter.appendChild(hideButton);
+  });
+}
+
 async function startDatabase() {
   if (isLoading) return;
   isLoading = true;
@@ -1679,25 +2613,37 @@ async function startDatabase() {
       placeholder: "No games match these filters.",
     });
 
+    table.on("tableBuilt", addColumnHideButtons);
     addColumnPicker(normalized.columns);
+    window.requestAnimationFrame(addColumnHideButtons);
 
     if (!databaseControlsBound) {
       searchElement.addEventListener("input", function () {
         applyGlobalSearch();
+        updateFilteredCardsButton();
         scheduleSearchUsage("all_columns", "", "", function () { return searchElement.value; });
       });
       clearButton.addEventListener("click", function () {
         const filtersWereActive = hasActiveUserFilters();
         searchElement.value = "";
-      if (gemstationModeActive) {
-        leaveGemstationMode();
-        return;
-      }
+        if (gemstationModeActive) {
+          leaveGemstationMode();
+          return;
+        }
+        freeGamesModeActive = false;
+        steamDeckVerifiedModeActive = false;
+        wantToPlayModeActive = false;
+        if (freeGamesButton) freeGamesButton.setAttribute("aria-pressed", "false");
+        if (steamDeckVerifiedButton) steamDeckVerifiedButton.setAttribute("aria-pressed", "false");
+        updateWantToPlayButton();
         if (filtersWereActive) sendUsageEvent("database_filters_cleared", { result_count: databaseRows.length });
         clearColumnFilters();
         table.clearFilter(true);
+        updateFilteredCardsButton();
       });
+    restoreSharedView();
     applyGlobalSearch();
+    openSharedGameCardFromUrl();
       databaseControlsBound = true;
     }
 
@@ -1721,6 +2667,12 @@ async function startDatabase() {
   }
 }
 
+if (shareFilteredViewButton) shareFilteredViewButton.addEventListener("click", copyFilteredViewLink);
+if (compareSelectedButton) compareSelectedButton.addEventListener("click", openSelectedComparison);
+if (clearCompareButton) clearCompareButton.addEventListener("click", clearCompareSelection);
+if (wantToPlayFilterButton) wantToPlayFilterButton.addEventListener("click", enterWantToPlayMode);
+updateWantToPlayButton();
+updateCompareButton();
 retryButton.addEventListener("click", startDatabase);
 
 startDatabase();
