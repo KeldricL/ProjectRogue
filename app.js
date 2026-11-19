@@ -784,6 +784,28 @@ function clearColumnFilters() {
   updateFilteredCardsButton();
 }
 
+function getColumnHeaderMinWidth(title, index, isPhone) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const bodyStyle = window.getComputedStyle(document.body);
+  const fontSize = isPhone ? 12 : 13;
+  const fontFamily = bodyStyle.fontFamily || "Arial, sans-serif";
+  const hasHideButton = index !== 0 && "c" + index !== GEMSTATION_DATE_FIELD;
+
+  if (context) context.font = "700 " + fontSize + "px " + fontFamily;
+  const titleWidth = context ? context.measureText(String(title || "")).width : String(title || "").length * fontSize * 0.65;
+  const horizontalPadding = isPhone ? 8 : 16;
+  const sortControlSpace = isPhone ? 16 : 20;
+  const hideControlSpace = hasHideButton ? (isPhone ? 18 : 20) : 0;
+  const controlGap = hasHideButton ? 4 : 0;
+  const minimumFilterWidth = isPhone ? 90 : 115;
+
+  return Math.ceil(Math.max(
+    minimumFilterWidth,
+    titleWidth + horizontalPadding + sortControlSpace + hideControlSpace + controlGap
+  ));
+}
+
 function normalizeResponse(payload) {
   if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
     throw new Error("The endpoint response must contain headers and rows arrays.");
@@ -818,9 +840,10 @@ function normalizeResponse(payload) {
       headerFilterLiveFilter: false,
       headerSort: true,
       sorter: "string",
-      minWidth: index === 0
-        ? (isPhone ? 130 : 190)
-        : (isPhone ? 90 : 115),
+      minWidth: Math.max(
+        index === 0 ? (isPhone ? 130 : 190) : (isPhone ? 90 : 115),
+        getColumnHeaderMinWidth(databaseHeaders[index], index, isPhone)
+      ),
       frozen: index === 0,
       hozAlign: index === 0 ? "left" : "center",
       headerHozAlign: index === 0 ? "left" : "center",
