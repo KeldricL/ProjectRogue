@@ -11,7 +11,8 @@
 html, body { width: 100%; height: 100%; min-height: 0; }
 body { height: 100vh; margin: 0; min-width: 320px; overflow: hidden; background: #111416; }
 
-.page-shell { display: flex; flex-direction: column; width: min(100%, 1800px); height: 100vh; min-height: 0; margin: 0 auto; padding: 28px clamp(12px, 2vw, 32px) 18px; overflow: hidden; }
+.page-shell { position: relative; display: flex; flex-direction: column; width: min(100%, 1800px); height: 100vh; min-height: 0; margin: 0 auto; padding: 28px clamp(12px, 2vw, 32px) 18px; overflow: hidden; }
+.fullscreen-corner-button { position: absolute; z-index: 20; top: 6px; right: 8px; min-height: 30px; padding: 4px 8px; border-radius: 6px; font-size: .74rem; line-height: 1.1; }
 
 .page-header { display: flex; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
 .eyebrow { margin: 0 0 5px; color: #83cf9a; font-size: .75rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
@@ -27,9 +28,26 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .database-status-row { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px 12px; min-height: 42px; margin-bottom: 8px; }
 .status { min-height: 24px; margin: 0; color: #b6c0c7; font-size: .9rem; }
 .status.error { color: #ff8d8d; }
+.duplicate-filter-warning { flex: 1 0 100%; margin: 0; color: #ff8d8d; font-size: .9rem; font-weight: 650; }
+.view-filtered-cards { min-height: 34px; padding: 5px 11px; border-color: #4c8760; color: #b9f0c5; white-space: nowrap; }
+.view-filtered-cards[hidden] { display: none; }
+.share-filtered-view { min-height: 34px; padding: 5px 11px; border-color: #526b88; color: #c7dcf4; white-space: nowrap; }
+.share-filtered-view[hidden] { display: none; }
+.compare-selected-games { min-height: 34px; padding: 5px 11px; border-color: #526b88; color: #c7dcf4; white-space: nowrap; }
+.compare-selected-games[hidden] { display: none; }
+.clear-compare-selection { min-height: 34px; padding: 5px 11px; border-color: #73575a; color: #efc2c2; white-space: nowrap; }
+.clear-compare-selection:hover { border-color: #c07d7d; background: #392a2c; }
+.clear-compare-selection[hidden] { display: none; }
+.compare-selected-games:disabled { opacity: .62; cursor: not-allowed; }
+.want-to-play-filter { min-height: 34px; padding: 5px 11px; border-color: #806a3c; color: #f1d79a; white-space: nowrap; }
+.want-to-play-filter[hidden] { display: none; }
+.want-to-play-filter[aria-pressed="true"] { border-color: #d0ae58; background: #4a3d22; color: #fff0bd; }
+.share-link-fallback { display: flex; flex: 1 1 100%; align-items: center; gap: 8px; color: #c7dcf4; font-size: .84rem; }
+.share-link-fallback[hidden] { display: none; }
+.share-link-fallback input { flex: 1 1 auto; width: min(100%, 720px); min-width: 0; min-height: 34px; padding: 6px 9px; border: 1px solid #526b88; border-radius: 6px; background: #171c1e; color: #eef2f4; font: inherit; font-size: .78rem; }
 .retry-button { min-height: 34px; padding: 5px 11px; border-color: #6dc583; color: #b9f0c5; }
 .retry-button[hidden] { display: none; }
-.table-frame { flex: 1 1 auto; height: auto; min-height: 0; overflow: hidden; border: 1px solid #41494d; border-radius: 9px; background: #1c2225; box-shadow: 0 5px 18px #00000035; }
+.table-frame { flex: 1 1 auto; height: auto; min-height: 0; margin-inline: calc(6px - clamp(12px, 2vw, 32px)); overflow: hidden; border: 1px solid #41494d; border-radius: 9px; background: #1c2225; box-shadow: 0 5px 18px #00000035; }
 #game-table { height: 100%; }
 .tabulator { border: 0; background: #1c2225; color: #e8edf1; font-size: 13px; }
 .tabulator .tabulator-header { border-bottom: 1px solid #465055; background: #2a3235; color: #f1f4f6; }
@@ -38,10 +56,18 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .tabulator .tabulator-header .tabulator-col .tabulator-col-sorter { color: #9de0aa; }
 .tabulator .tabulator-header .tabulator-col .tabulator-col-content { padding: 9px 8px; }
 .tabulator .tabulator-header .tabulator-col .tabulator-col-title { white-space: nowrap; line-height: 1.25; }
+.tabulator .tabulator-header .tabulator-col.has-column-hide-button .tabulator-col-title-holder { display: flex; align-items: center; width: 100%; gap: 3px; }
+.tabulator .tabulator-header .tabulator-col.has-column-hide-button .tabulator-col-title { flex: 1 1 auto; min-width: 0; }
+.tabulator .tabulator-header .tabulator-col.has-column-hide-button .tabulator-col-sorter { position: static; display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 3px; width: auto; margin: 0; }
+.tabulator .tabulator-header .tabulator-col .column-hide-button { display: inline-flex; flex: 0 0 15px; align-items: center; justify-content: center; width: 15px; min-width: 15px; height: 15px; min-height: 15px; margin: 0; padding: 0; border: 1px solid #64716d; border-radius: 4px; background: #202729; color: #c6d2cd; font-size: 12px; font-weight: 700; line-height: 1; cursor: pointer; }
+.tabulator .tabulator-header .tabulator-col .column-hide-button:hover { border-color: #83cf9a; background: #35413c; color: #f1fff4; }
+.tabulator .tabulator-header .tabulator-col .column-hide-button:focus-visible { outline: 2px solid #83cf9a; outline-offset: 1px; }
 .tabulator .tabulator-header-filter input { width: calc(100% - 8px); min-width: 48px; margin: 2px 4px 5px; padding: 5px 6px; border: 1px solid #4b555a; border-radius: 4px; background: #1c2225; color: #f1f5f8; font: inherit; font-size: 12px; }
 .tabulator .tabulator-header-filter input::placeholder { color: #89949b; }
 .tabulator .tabulator-row { min-height: 36px; border-bottom: 1px solid #30383b; background: #1c2225; }
 .tabulator .tabulator-row .tabulator-cell { padding: 8px; color: #e8edf1 !important; }
+.tabulator .tabulator-row .tabulator-cell:first-child { cursor: pointer; }
+.tabulator .tabulator-row .tabulator-cell:first-child:hover .game-name-card-trigger { color: #b8efc3 !important; text-decoration: underline; text-underline-offset: 2px; }
 #game-table .tabulator .tabulator-row .tabulator-cell,
 #game-table .tabulator .tabulator-row .tabulator-cell span { color: #f5f7fa !important; }
 .tabulator .tabulator-row.tabulator-row-even { background: #222a2d; }
@@ -56,6 +82,8 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .page-footer { display: flex; flex: 0 0 auto; justify-content: space-between; gap: 12px; padding: 10px 2px 0; color: #aeb8bf; font-size: .82rem; }
 .header-button-row { grid-column: 1 / -1; display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 8px; }
 .header-button-row button { width: auto; }
+.free-games-button { border-color: #4c8760; color: #b9f0c5; }
+.free-games-button[aria-pressed="true"] { background: #294534; border-color: #83cf9a; color: #d4f7da; }
 .comparison-filter-select { min-height: 42px; max-width: 250px; padding: 8px 30px 8px 11px; border: 1px solid #4b555a; border-radius: 7px; background: #252b2e; color: #eef2f4; font: inherit; font-weight: 650; cursor: pointer; }
 .comparison-filter-select:hover { border-color: #6dc583; background: #30393a; }
 .comparison-filter-select:focus { border-color: #6dc583; outline: 3px solid #6dc58333; }
@@ -214,7 +242,8 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .column-value-menu-selected-count { color: #bac7c0; font-size: .8rem; }
 .column-value-menu-done { flex: 0 0 auto; }
 .game-name-with-note { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
-.game-name-note-text { min-width: 0; }
+.game-name-card-trigger { min-width: 0; cursor: pointer; }
+.game-name-card-trigger:focus-visible { outline: 2px solid #83cf9a; outline-offset: 2px; border-radius: 2px; }
 .game-note-indicator {
   display: inline-flex;
   flex: 0 0 16px;
@@ -273,11 +302,22 @@ button:hover { border-color: #6dc583; background: #30393a; }
   border-bottom: 1px solid #41494d;
   background: #20282a;
 }
+.surprise-game-heading { flex: 1 1 auto; min-width: 0; }
 .surprise-game-title { margin: 0; color: #f5f7fa; font-size: clamp(1.45rem, 4vw, 2rem); font-weight: 800; line-height: 1.2; }
+.surprise-game-note { margin: 7px 0 0; color: #c3cfca; font-size: .93rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.surprise-game-note[hidden] { display: none; }
 .surprise-close { flex: 0 0 auto; width: 38px; min-height: 38px; padding: 0; font-size: 1.6rem; line-height: 1; }
 .surprise-card-body { min-height: 0; overflow: auto; padding: 18px 20px 22px; overscroll-behavior: contain; }
+.surprise-card-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 12px; }
+.surprise-card-actions button { min-height: 32px; padding: 5px 10px; font-size: .82rem; }
+.surprise-favorite-button { border-color: #806a3c; color: #f1d79a; }
+.surprise-favorite-button[aria-pressed="true"] { border-color: #d0ae58; background: #4a3d22; color: #fff0bd; }
+.surprise-compare-button[aria-pressed="true"] { border-color: #6f8bb5; background: #27364a; color: #d3e3ff; }
+.surprise-share-button { border-color: #526b88; color: #c7dcf4; }
+.surprise-share-link { width: 100%; min-height: 34px; margin: -5px 0 12px; padding: 6px 9px; border: 1px solid #526b88; border-radius: 6px; background: #171c1e; color: #eef2f4; font: inherit; font-size: .8rem; }
+.surprise-share-link[hidden] { display: none; }
 .surprise-primary-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 16px; }
-.surprise-primary-fact { min-width: 0; padding: 10px 12px; border: 1px solid #3e4a4c; border-radius: 8px; background: #252d30; }
+.surprise-primary-fact { min-width: 0; padding: 7px 12px; border: 1px solid #3e4a4c; border-radius: 8px; background: #252d30; }
 .surprise-field-label, .surprise-detail-label { display: block; margin-bottom: 4px; color: #aebbb7; font-size: .77rem; font-weight: 700; letter-spacing: .025em; }
 .surprise-field-value { display: block; color: #f1f5f3; font-weight: 650; overflow-wrap: anywhere; }
 .surprise-tags { margin: 4px 0 18px; }
@@ -293,24 +333,47 @@ button:hover { border-color: #6dc583; background: #30393a; }
 .surprise-details { margin-top: 8px; }
 .surprise-section-heading { margin-bottom: 9px; color: #b8efc3; font-size: .98rem; }
 .surprise-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 7px 9px; }
-.surprise-detail-item { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 7px; min-width: 0; padding: 9px 11px; border: 1px solid #303b3e; border-radius: 7px; background: #202729; }
+.surprise-detail-item { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 6px; min-width: 0; padding: 5px 9px; border: 1px solid #303b3e; border-radius: 7px; background: #202729; line-height: 1.2; }
 .surprise-dialog .surprise-detail-grid > .surprise-detail-item { align-self: start !important; height: fit-content !important; min-height: 0 !important; }
 .surprise-detail-item .surprise-detail-label { display: inline; flex: 0 1 auto; margin: 0; }
 .surprise-detail-separator { color: #83cf9a; font-weight: 800; }
 .surprise-detail-value { display: inline; min-width: 0; color: #e8edf5; overflow-wrap: anywhere; }
-.surprise-feature-chip { display: inline-flex; justify-self: start; width: fit-content; max-width: 100%; align-items: center; min-height: 36px; padding: 7px 11px; border: 1px solid #3f7650; border-radius: 999px; background: #23372a; color: #b8efc3; font-size: .84rem; font-weight: 650; line-height: 1.25; }
+.surprise-feature-chip { display: inline-flex; justify-self: start; width: fit-content; max-width: 100%; align-items: center; min-height: 30px; padding: 4px 11px; border: 1px solid #3f7650; border-radius: 999px; background: #23372a; color: #b8efc3; font-size: .84rem; font-weight: 650; line-height: 1.25; }
 .surprise-feature-section { margin-top: 12px; }
 .surprise-feature-heading { margin: 0 0 7px; color: #b8efc3; font-size: .84rem; font-weight: 750; }
 .surprise-feature-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 7px; }
 .surprise-links { margin-top: 20px; padding-top: 14px; border-top: 1px solid #41494d; }
-.surprise-link-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 10px; }
-.surprise-link-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; width: 180px; min-width: 0; }
-.surprise-game-link { display: inline-flex; justify-self: start; align-items: center; max-width: 100%; min-height: 36px; margin: 0; padding: 7px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
+.surprise-submit-missing { display: flex; width: fit-content; max-width: 100%; min-height: 38px; margin: 22px auto 0; padding: 8px 14px; align-items: center; justify-content: center; border: 1px solid #83cf9a; border-radius: 8px; background: #b8efc3; color: #23372a; font-weight: 700; line-height: 1.3; text-align: center; text-decoration: none; }
+.surprise-submit-missing:hover { border-color: #a4e8b2; background: #d4f7da; color: #17201d; }
+dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing { border-color: #83cf9a !important; background-color: #b8efc3 !important; color: #23372a !important; }
+dialog.surprise-dialog .surprise-card-body > a.surprise-submit-missing:hover { border-color: #a4e8b2 !important; background-color: #d4f7da !important; color: #17201d !important; }
+.surprise-link-cards { display: grid; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.surprise-link-card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; width: auto; min-width: 0; }
+.surprise-game-link { display: inline-flex; justify-self: start; align-items: center; max-width: 100%; min-height: 30px; margin: 0; padding: 4px 12px; border: 1px solid #4b6755; border-radius: 7px; background: #26352b; color: #b8efc3; font-weight: 700; text-decoration: none; }
 .surprise-game-link:hover { border-color: #83cf9a; background: #304237; }
-.surprise-thumbnail-link { display: flex; width: 100%; height: 102px; margin: 0; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
+.surprise-affiliate-link-card .surprise-game-link { justify-content: center; padding-right: 5px; padding-left: 5px; font-size: clamp(.62rem, .9vw, .82rem); line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+.surprise-thumbnail-link { display: flex; width: 100%; height: auto; aspect-ratio: 16 / 9; margin: 0; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #41494d; border-radius: 8px; background: #111416; color: #b8efc3; text-decoration: none; }
 .surprise-thumbnail-link img { display: block; width: 100%; height: 100%; padding: 2px; object-fit: contain; }
 .surprise-thumbnail-link.thumbnail-unavailable { font-size: .82rem; font-weight: 700; }
 .surprise-no-links { margin: 0; color: #aeb8bf; }
+.compare-dialog { width: min(1500px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: 92vh; max-height: 92dvh; padding: 0; overflow: hidden; border: 1px solid #53605b; border-radius: 12px; background: #1c2225; color: #e8edf5; box-shadow: 0 14px 42px #000b; }
+.compare-dialog::backdrop { background: #080b0dcc; backdrop-filter: blur(4px); }
+.compare-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #41494d; background: #20282a; }
+.compare-dialog-header h2 { margin: 0; color: #f5f7fa; font-size: 1.25rem; }
+.compare-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 10px; max-height: calc(92vh - 65px); max-height: calc(92dvh - 65px); padding: 10px; overflow: auto; }
+.compare-game-card { grid-area: auto; width: 100%; min-width: 0; max-height: calc(92vh - 85px); max-height: calc(92dvh - 85px); }
+.compare-game-card .surprise-card-header { padding: 10px 12px; }
+.compare-game-card .surprise-game-title { font-size: clamp(1rem, 1.5vw, 1.35rem); overflow-wrap: anywhere; }
+.compare-game-card .surprise-card-body { padding: 10px 12px 14px; }
+.compare-game-card .surprise-primary-fields { grid-template-columns: 1fr; gap: 5px; margin-bottom: 10px; }
+.compare-game-card .surprise-primary-fact { padding: 5px 8px; }
+.compare-game-card .surprise-tag-columns { gap: 8px; }
+.compare-game-card .surprise-tag-column { gap: 8px; }
+.compare-game-card .surprise-detail-grid { grid-template-columns: 1fr; gap: 5px; }
+.compare-game-card .surprise-link-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.compare-game-card .surprise-link-card { width: auto; gap: 5px; }
+.compare-game-card .surprise-thumbnail-link { height: auto; aspect-ratio: 16 / 9; }
+.compare-remove-game { flex: 0 0 auto; min-height: 30px; padding: 4px 8px; font-size: .78rem; }
 .surprise-dialog[open] { display: block; }
 .surprise-primary-fields[hidden], .surprise-tags[hidden], .surprise-details[hidden] { display: none; }
 
@@ -341,7 +404,7 @@ html:fullscreen .page-shell {
 html:fullscreen .page-header,
 html:fullscreen .status,
 html:fullscreen .page-footer { flex: 0 0 auto; }
-html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
+html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; margin-inline: -12px; }
 
 @media (min-width: 761px) {
   .header-actions { width: min(460px, 45vw); min-width: 0; flex: 0 1 460px; grid-template-columns: minmax(0, 1fr) auto; }
@@ -367,8 +430,9 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .header-button-row { flex-direction: column; align-items: stretch; }
   .header-button-row button { width: 100%; }
   .header-button-row.surprise-controls-row { flex-direction: row; align-items: stretch; }
-  .header-button-row.surprise-controls-row button { width: auto; flex: 1 1 0; }
+  .header-button-row.surprise-controls-row button { width: auto; flex: 1 1 0; padding-right: 7px; padding-left: 7px; font-size: .8rem; white-space: nowrap; }
   .comparison-filter-select { width: 100%; max-width: none; }
+  .comparison-filter-select { text-align: center; text-align-last: center; }
   .surprise-dialog { width: calc(100vw - 16px); max-height: 94vh; max-height: 94dvh; }
   .surprise-dialog-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "card card" "previous next"; gap: 9px 12px; }
   .surprise-card { grid-area: card; }
@@ -380,11 +444,11 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .surprise-primary-fields { grid-template-columns: 1fr; }
   .surprise-detail-grid { grid-template-columns: 1fr; }
   .surprise-thumbnail-link { height: auto; aspect-ratio: 16 / 9; }
-  .surprise-link-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .surprise-link-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .surprise-link-card { width: auto; }
   .column-picker-menu { position: fixed; top: 50%; right: auto; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 24px)); max-height: min(70vh, 520px); }
   .column-value-menu { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 20px)); max-height: min(72vh, 560px); }
-  .table-frame { flex: 1 1 auto; height: auto; min-height: 0; border-radius: 6px; }
+  .table-frame { flex: 1 1 auto; height: auto; min-height: 0; margin-inline: -2px; border-radius: 6px; }
   .tabulator { font-size: 12px; }
   .tabulator .tabulator-header .tabulator-col .tabulator-col-content { padding: 7px 4px; }
   .tabulator .tabulator-header-filter input { min-width: 44px; margin: 2px 2px 4px; padding: 4px 3px; font-size: 11px; }
@@ -392,7 +456,176 @@ html:fullscreen .table-frame { flex: 1 1 auto; height: auto; min-height: 0; }
   .page-footer { font-size: .75rem; }
 }
 
+/* Keep the two lower control rows the same width as the search/clear row. */
+.header-button-row { width: 100%; min-width: 0; padding-left: 0; flex-wrap: nowrap; }
+.header-button-row > button,
+.header-button-row > select { width: auto; min-width: 0; flex: 1 1 0; }
+.header-button-row > .comparison-filter-select { max-width: none; }
+.header-button-row.surprise-controls-row > button { padding-right: 8px; padding-left: 8px; }
+.header-button-row.surprise-controls-row > #surprise-me-button,
+.header-button-row.surprise-controls-row > #free-games-button { flex: 1 1 0; }
+.header-button-row.surprise-controls-row > #newest-game-button { flex: 1.4 1 0; white-space: nowrap; }
+.header-button-row.steam-deck-verified-row { justify-content: flex-start; }
+.header-button-row.steam-deck-verified-row > #steam-deck-verified-button { flex: 0 0 auto; width: auto; border-color: #4c8760; color: #b9f0c5; white-space: nowrap; }
+.header-button-row.steam-deck-verified-row > #steam-deck-verified-button[aria-pressed="true"] { background: #294534; border-color: #83cf9a; color: #d4f7da; }
+
+@media (max-width: 600px) {
+  .header-button-row { flex-direction: row; align-items: stretch; }
+  .header-button-row > button,
+  .header-button-row > select { width: auto; }
+  .header-button-row.surprise-controls-row > button { padding-right: 6px; padding-left: 6px; font-size: .8rem; white-space: normal; }
+  .header-button-row > .comparison-filter-select { padding-right: 24px; padding-left: 7px; font-size: .8rem; }
+}
+
 @media (max-width: 600px) and (display-mode: fullscreen) {
   html:fullscreen .page-shell { padding: 8px; }
-  html:fullscreen .table-frame { min-height: 0; }
+  html:fullscreen .table-frame { min-height: 0; margin-inline: -2px; }
+}
+
+/* Compact game-card layout for phone screens. */
+@media (max-width: 600px) {
+  .surprise-dialog { width: calc(100vw - 24px); max-height: 90vh; max-height: 90dvh; }
+  .surprise-dialog-layout { gap: 6px 10px; }
+  .surprise-card { max-height: calc(90vh - 48px); max-height: calc(90dvh - 48px); }
+  .surprise-card-header { gap: 8px; padding: 8px 10px; }
+  .surprise-game-title { font-size: clamp(1.2rem, 5.6vw, 1.55rem); line-height: 1.15; }
+  .surprise-game-note { margin-top: 4px; font-size: .8rem; line-height: 1.3; }
+  .surprise-close { width: 34px; min-height: 34px; font-size: 1.4rem; }
+  .surprise-card-body { padding: 9px 10px 12px; }
+  .surprise-primary-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 9px; }
+  .surprise-primary-fact { padding: 4px 8px; border-radius: 6px; }
+  .surprise-field-label, .surprise-detail-label { margin-bottom: 2px; font-size: .69rem; }
+  .surprise-field-value { font-size: .84rem; line-height: 1.25; }
+  .surprise-tags { margin: 2px 0 10px; }
+  .surprise-tag-columns { gap: 9px; }
+  .surprise-tag-column { gap: 8px; }
+  .surprise-tag-group { gap: 4px; }
+  .surprise-tag-heading, .surprise-section-heading { font-size: .78rem; }
+  .surprise-tag-list, .surprise-feature-list { gap: 5px; }
+  .surprise-tag { min-height: 25px; padding: 3px 8px; font-size: .75rem; }
+  .surprise-details { margin-top: 5px; }
+  .surprise-section-heading { margin-bottom: 6px; }
+  .surprise-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .surprise-detail-item { gap: 2px 5px; padding: 4px 6px; border-radius: 6px; font-size: .78rem; line-height: 1.2; }
+  .surprise-detail-item .surprise-detail-label { font-size: .67rem; }
+  .surprise-feature-section { margin-top: 8px; }
+  .surprise-feature-heading { margin-bottom: 5px; font-size: .77rem; }
+  .surprise-feature-chip { min-height: 25px; padding: 3px 8px; font-size: .75rem; }
+  .surprise-links { margin-top: 12px; padding-top: 9px; }
+  .surprise-submit-missing { min-height: 34px; margin-top: 16px; padding: 6px 10px; font-size: .78rem; }
+  .surprise-link-card { gap: 5px; }
+  .surprise-game-link { min-height: 26px; padding: 3px 5px; font-size: .72rem; line-height: 1.15; overflow-wrap: anywhere; }
+  .surprise-thumbnail-link { max-height: 86px; }
+}
+
+@media (min-width: 1000px) {
+  html:fullscreen .page-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(36px, 5vw, 100px);
+  }
+  html:fullscreen .page-header > div:first-child { grid-column: 1; min-width: 0; }
+  html:fullscreen .header-actions {
+    grid-column: 2;
+    justify-self: center;
+    width: min(700px, 100%);
+    min-width: 0;
+    flex: initial;
+  }
+  html:fullscreen .header-button-row { padding-left: 0; }
+}
+
+@media (max-width: 900px) {
+  .compare-card-grid { grid-template-columns: repeat(3, minmax(260px, 1fr)); overflow-x: auto; }
+}
+
+html:fullscreen .compare-dialog { width: min(2200px, 96vw); max-width: 96vw; max-height: 94vh; max-height: 94dvh; }
+html:fullscreen .compare-card-grid { max-height: calc(94vh - 65px); max-height: calc(94dvh - 65px); }
+
+@media (max-width: 600px) {
+  .compare-dialog { width: calc(100vw - 12px); max-width: calc(100vw - 12px); max-height: 96vh; max-height: 96dvh; }
+  .compare-dialog-header { padding: 9px 11px; }
+  .compare-card-grid { grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 8px; max-height: calc(96vh - 56px); max-height: calc(96dvh - 56px); padding: 7px; }
+  .compare-game-card { max-height: calc(96vh - 75px); max-height: calc(96dvh - 75px); }
+  .surprise-card-actions button { flex: 1 1 auto; }
+}
+
+
+/* Keep comparison cards in their own side-by-side layout, separate from Surprise Me card placement. */
+dialog.compare-dialog > .compare-card-grid {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: stretch;
+  overflow: auto;
+}
+dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-card {
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-card {
+    flex: 0 0 260px;
+  }
+}
+
+
+/* Stack compare cards on phone screens so each full card is readable without sideways scrolling. */
+@media (max-width: 600px) {
+  dialog.compare-dialog {
+    width: calc(100vw - 12px);
+    max-width: calc(100vw - 12px);
+    max-height: 96vh;
+    max-height: 96dvh;
+  }
+  dialog.compare-dialog > .compare-card-grid {
+    flex-direction: column;
+    align-items: stretch;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(96vh - 56px);
+    max-height: calc(96dvh - 56px);
+  }
+  dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-card {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: none;
+  }
+  dialog.compare-dialog .compare-game-card > .surprise-card-body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+}
+
+
+/* Also stack comparison cards on touch devices when the embedded frame reports a desktop-sized viewport. */
+@media (max-width: 900px), (hover: none) and (pointer: coarse) and (max-width: 1400px) {
+  dialog.compare-dialog {
+    width: min(700px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
+    max-height: 96vh;
+    max-height: 96dvh;
+  }
+  dialog.compare-dialog > .compare-card-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(96vh - 56px);
+    max-height: calc(96dvh - 56px);
+  }
+  dialog.compare-dialog > .compare-card-grid > article.surprise-card.compare-game-card {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: none;
+  }
+  dialog.compare-dialog .compare-game-card > .surprise-card-body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
 }

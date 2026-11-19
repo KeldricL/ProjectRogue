@@ -16,10 +16,11 @@
     });
   </script>
   <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.5.0/dist/css/tabulator.min.css">
-  <link rel="stylesheet" href="styles.css?v=20261118-full-column-titles-1">
+  <link rel="stylesheet" href="styles.css?v=20261118-restored-header-widths-1">
 </head>
 <body>
   <main class="page-shell">
+    <button id="fullscreen-toggle" class="fullscreen-corner-button" type="button" aria-pressed="false">Full screen</button>
     <header class="page-header">
       <div>
         <p class="eyebrow">Keldric Gaming</p>
@@ -31,12 +32,21 @@
         <label class="search-label" for="global-search">Search all columns</label>
         <input id="global-search" type="search" placeholder="Type to search…" autocomplete="off">
         <button id="clear-filters" type="button">Clear filters</button>
-        <button id="fullscreen-toggle" type="button" aria-pressed="false">Full screen</button>
       </div>
     </header>
 
     <div class="database-status-row">
+      <button id="view-filtered-cards" class="view-filtered-cards" type="button" hidden>View these game cards</button>
+      <button id="share-filtered-view" class="share-filtered-view" type="button" hidden>Copy link to these filters</button>
+      <button id="compare-selected-games" class="compare-selected-games" type="button" hidden disabled>Compare selected (0/3)</button>
+      <button id="clear-compare-selection" class="clear-compare-selection" type="button" hidden>Clear comparison</button>
+      <button id="want-to-play-filter" class="want-to-play-filter" type="button" aria-pressed="false" hidden>Want to play (0)</button>
+      <label id="share-link-fallback" class="share-link-fallback" hidden>
+        <span>Copy this link:</span>
+        <input id="share-link-text" type="text" readonly aria-label="Share link for the current filters">
+      </label>
       <div id="status" class="status" role="status" aria-live="polite">Loading game database…</div>
+      <div id="duplicate-filter-warning" class="duplicate-filter-warning" role="alert" hidden></div>
       <button id="retry-database" class="retry-button" type="button" hidden>Reload database</button>
     </div>
     <section class="table-frame" aria-label="Game database table">
@@ -48,9 +58,11 @@
     </footer>
   </main>
 
-  <script src="https://unpkg.com/tabulator-tables@6.5.0/dist/js/tabulator.min.js"></script>
-  <script src="app.js?v=20261118-full-column-titles-1"></script>
+  <script type="module" src="tabulator-slim-loader.js?v=20261118-restored-header-widths-1"></script>
 </body>
 </html>
+
+
+
 
 

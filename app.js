@@ -345,7 +345,7 @@ function gameNameFormatter(cell) {
   name.setAttribute("role", "button");
   name.setAttribute("tabindex", "0");
   name.setAttribute("aria-label", "View game card for " + gameName);
-  name.title = note || "Click to view this game's card";
+  name.title = "Click to view this game's card";
   name.addEventListener("click", function (event) {
     event.preventDefault();
     event.stopPropagation();
@@ -365,8 +365,8 @@ function gameNameFormatter(cell) {
   const indicator = document.createElement("span");
   indicator.className = "game-note-indicator";
   indicator.textContent = "i";
-  indicator.title = note;
-  indicator.setAttribute("aria-label", "Game note: " + note);
+  indicator.title = "This game has a note. Hover to read it.";
+  indicator.setAttribute("aria-label", "This game has a note. Hover to read it.");
 
   wrapper.append(name, indicator);
   return wrapper;
@@ -787,25 +787,20 @@ function clearColumnFilters() {
 function getColumnHeaderMinWidth(title, index, isPhone) {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
-  const bodyStyle = window.getComputedStyle(document.body);
   const fontSize = isPhone ? 12 : 13;
-  const fontFamily = bodyStyle.fontFamily || "Arial, sans-serif";
+  const fontFamily = window.getComputedStyle(document.body).fontFamily || "Arial, sans-serif";
   const hasHideButton = index !== 0 && "c" + index !== GEMSTATION_DATE_FIELD;
+  const headerTitle = String(title || "");
 
   if (context) context.font = "700 " + fontSize + "px " + fontFamily;
-  const titleWidth = context ? context.measureText(String(title || "")).width : String(title || "").length * fontSize * 0.65;
-  const horizontalPadding = isPhone ? 8 : 16;
-  const sortControlSpace = isPhone ? 16 : 20;
-  const hideControlSpace = hasHideButton ? (isPhone ? 18 : 20) : 0;
-  const controlGap = hasHideButton ? 4 : 0;
-  const minimumFilterWidth = isPhone ? 90 : 115;
+  const measuredTitle = context ? context.measureText(headerTitle).width : headerTitle.length * fontSize * 0.65;
+  const padding = isPhone ? 8 : 16;
+  const sortControl = isPhone ? 16 : 20;
+  const hideControl = hasHideButton ? 18 : 0;
+  const minimum = isPhone ? 90 : 115;
 
-  return Math.ceil(Math.max(
-    minimumFilterWidth,
-    titleWidth + horizontalPadding + sortControlSpace + hideControlSpace + controlGap
-  ));
+  return Math.ceil(Math.max(minimum, measuredTitle + padding + sortControl + hideControl + (hasHideButton ? 3 : 0)));
 }
-
 function normalizeResponse(payload) {
   if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
     throw new Error("The endpoint response must contain headers and rows arrays.");
@@ -855,6 +850,17 @@ function normalizeResponse(payload) {
             ? function (cell) { return formatMultiplayerSummary(cell.getValue()); }
             : textFormatter)),
     };
+
+    if (index === 0) {
+      definition.tooltip = function (_event, cell) {
+        const note = String(cell.getRow().getData().note0 || "").trim();
+        if (!note) return false;
+        const tooltip = document.createElement("div");
+        tooltip.className = "game-note-tooltip-content";
+        tooltip.textContent = note;
+        return tooltip;
+      };
+    }
 
     if (index === 1) {
       definition.sorter = function (a, b, aRow, bRow) {
