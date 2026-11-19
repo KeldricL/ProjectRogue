@@ -2224,7 +2224,7 @@ function leaveGemstationMode() {
   updateFilteredCardsButton();
   const count = Number(countElement.textContent.replace(/[^0-9]/g, ""));
   setStatus("Loaded " + (Number.isFinite(count) ? count.toLocaleString() : databaseRows.length.toLocaleString()) + " games from the Master worksheet.", false);
-  if (new URL(window.location.href).searchParams.get("embedCard") === "1") window.parent.postMessage({ type: "project-rogue-card-ready" }, "*");
+
 }
 
 function enterFreeGamesMode() {
@@ -2703,6 +2703,7 @@ async function startDatabase() {
     const shownCount = Number.isFinite(recordCount) ? recordCount : normalized.data.length;
     countElement.textContent = shownCount.toLocaleString() + " games";
     setStatus("Loaded " + shownCount.toLocaleString() + " games from the Master worksheet.", false);
+    if (new URL(window.location.href).searchParams.get("embedCard") === "1") window.parent.postMessage({ type: "project-rogue-card-ready" }, "*");
   } catch (error) {
     console.error("Keldric Gaming database error:", error);
     if (table) {
