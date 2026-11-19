@@ -2089,6 +2089,26 @@ function openSharedGameCardFromUrl() {
   renderSurpriseGame(row);
 }
 
+window.addEventListener("message", function (event) {
+  if (event.origin !== "https://www.keldricgaming.com" && event.origin !== "https://keldricgaming.com") return;
+  if (new URL(window.location.href).searchParams.get("embedCard") !== "1") return;
+  const data = event.data || {};
+  if (data.type !== "project-rogue-open-game" || !table || typeof data.gameName !== "string") return;
+  const key = data.gameName.normalize("NFKC").trim().toLocaleLowerCase();
+  const row = databaseRows.find(function (candidate) {
+    return favoriteKeyForGame(candidate) === key;
+  });
+  if (!row) {
+    window.parent.postMessage({ type: "project-rogue-card-error", gameName: data.gameName }, event.origin);
+    return;
+  }
+  try { loadSurpriseDefinitions(); } catch (_error) {}
+  cardBrowseMode = "list";
+  filteredCardRows = databaseRows.slice();
+  filteredCardIndex = filteredCardRows.indexOf(row);
+  renderSurpriseGame(row);
+});
+
 function restoreSharedView() {
   if (sharedViewRestored) return;
   sharedViewRestored = true;
@@ -2204,6 +2224,7 @@ function leaveGemstationMode() {
   updateFilteredCardsButton();
   const count = Number(countElement.textContent.replace(/[^0-9]/g, ""));
   setStatus("Loaded " + (Number.isFinite(count) ? count.toLocaleString() : databaseRows.length.toLocaleString()) + " games from the Master worksheet.", false);
+  if (new URL(window.location.href).searchParams.get("embedCard") === "1") window.parent.postMessage({ type: "project-rogue-card-ready" }, "*");
 }
 
 function enterFreeGamesMode() {
