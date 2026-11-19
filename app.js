@@ -785,21 +785,30 @@ function clearColumnFilters() {
 }
 
 function getColumnHeaderMinWidth(title, index, isPhone) {
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
   const fontSize = isPhone ? 12 : 13;
-  const fontFamily = window.getComputedStyle(document.body).fontFamily || "Arial, sans-serif";
   const hasHideButton = index !== 0 && "c" + index !== GEMSTATION_DATE_FIELD;
   const headerTitle = String(title || "");
+  const bodyFont = window.getComputedStyle(document.body).fontFamily || "Arial, sans-serif";
+  const probe = document.createElement("span");
+  probe.textContent = headerTitle;
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.whiteSpace = "nowrap";
+  probe.style.fontFamily = bodyFont;
+  probe.style.fontSize = fontSize + "px";
+  probe.style.fontWeight = "700";
+  document.body.appendChild(probe);
+  const measuredTitle = probe.getBoundingClientRect().width;
+  probe.remove();
 
-  if (context) context.font = "700 " + fontSize + "px " + fontFamily;
-  const measuredTitle = context ? context.measureText(headerTitle).width : headerTitle.length * fontSize * 0.65;
-  const padding = isPhone ? 8 : 16;
-  const sortControl = isPhone ? 16 : 20;
+  const horizontalPadding = isPhone ? 14 : 16;
+  const sortControl = 16;
   const hideControl = hasHideButton ? 18 : 0;
+  const controlGaps = hasHideButton ? 6 : 0;
+  const safetySpace = 10;
   const minimum = isPhone ? 90 : 115;
 
-  return Math.ceil(Math.max(minimum, measuredTitle + padding + sortControl + hideControl + (hasHideButton ? 3 : 0)));
+  return Math.ceil(Math.max(minimum, measuredTitle + horizontalPadding + sortControl + hideControl + controlGaps + safetySpace));
 }
 function normalizeResponse(payload) {
   if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
@@ -824,6 +833,10 @@ function normalizeResponse(payload) {
 
   const columns = payload.headers.map(function (header, index) {
     const normalizedHeader = cleanGameValue(header).replace(/[?]/g, "").replace(/\s+/g, " ").toLocaleLowerCase();
+    const columnHeaderWidth = Math.max(
+      index === 0 ? (isPhone ? 130 : 190) : (isPhone ? 90 : 115),
+      getColumnHeaderMinWidth(databaseHeaders[index], index, isPhone)
+    );
     const definition = {
       title: databaseHeaders[index],
       field: "c" + index,
@@ -835,10 +848,10 @@ function normalizeResponse(payload) {
       headerFilterLiveFilter: false,
       headerSort: true,
       sorter: "string",
-      minWidth: Math.max(
-        index === 0 ? (isPhone ? 130 : 190) : (isPhone ? 90 : 115),
-        getColumnHeaderMinWidth(databaseHeaders[index], index, isPhone)
-      ),
+
+      width: columnHeaderWidth,
+      minWidth: columnHeaderWidth,
+
       frozen: index === 0,
       hozAlign: index === 0 ? "left" : "center",
       headerHozAlign: index === 0 ? "left" : "center",
